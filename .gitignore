@@ -3,3 +3,6 @@
 /.phpunit.cache/
 *.ip-blocker-pos
 .phpunit.result.cache
+*.DS_Store
+.idea/
+.phpunit.cache/

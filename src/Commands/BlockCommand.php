@@ -30,7 +30,7 @@ class BlockCommand extends Command
         $customDuration = $this->option('duration');
 
         if ($specificIp !== null) {
-            return $this->blockSpecificIp($analyzer, $specificIp, $customReason, $customDuration, $dryRun);
+            return $this->blockSpecificIp($analyzer, $specificIp, $customReason, $customDuration, $dryRun, $force);
         }
 
         return $this->analyzeAndBlock($analyzer, $denyGenerator, $dryRun, $force, $noNginx, $customDuration);
@@ -45,6 +45,7 @@ class BlockCommand extends Command
         ?string $customReason,
         ?string $customDuration,
         bool $dryRun,
+        bool $force = false,
     ): int {
         $this->components->info("Checking IP: {$ip}");
 

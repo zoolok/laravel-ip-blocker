@@ -50,9 +50,12 @@ class IpAnalyzerTest extends TestCase
             blockDuration: 120,
         );
 
+        $start = now();
         $expiration = $analyzer->getBlockExpiration();
 
         $this->assertNotNull($expiration);
-        $this->assertTrue($expiration->diffInMinutes(now()) >= 119);
+        $this->assertTrue($expiration->isFuture(), 'Expiration should be in the future');
+        $this->assertTrue($expiration->greaterThan($start), 'Expiration should be after start');
+        $this->assertEqualsWithDelta(120, $start->diffInMinutes($expiration, absolute: true), 0.1);
     }
 }

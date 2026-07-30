@@ -2,8 +2,8 @@
 
 namespace Zoolok\IpBlocker\Services;
 
-use Illuminate\Support\Facades\Log;
-use Zoolok\IpBlocker\Models\BlockedIp;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 class DenyGenerator
 {
@@ -14,6 +14,7 @@ class DenyGenerator
         private readonly string $denyPath = '/etc/nginx/conf.d/blocked-ips.conf',
         private readonly string $reloadCommand = 'nginx -s reload',
         private readonly string $allowOverridePath = '/var/www/html/.htaccess',
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
 
     /**
@@ -24,13 +25,11 @@ class DenyGenerator
      */
     public function generate(array $ips): bool
     {
-        $activeIps = BlockedIp::active()->pluck('ip')->toArray();
-
-        $uniqueIps = array_unique(array_merge($activeIps, $ips));
+        $uniqueIps = array_unique($ips);
 
         sort($uniqueIps);
 
-        Log::info('[DenyGenerator.generate] Generating deny config', [
+        $this->logger->info('[DenyGenerator.generate] Generating deny config', [
             'server_type' => $this->serverType,
             'deny_path' => $this->serverType === 'nginx' ? $this->denyPath : $this->allowOverridePath,
             'ips_count' => count($uniqueIps),
@@ -46,7 +45,7 @@ class DenyGenerator
             $dir = dirname($targetPath);
             if (! is_dir($dir)) {
                 mkdir($dir, 0755, true);
-                Log::debug('[DenyGenerator.generate] Created directory', [
+                $this->logger->debug('[DenyGenerator.generate] Created directory', [
                     'path' => $dir,
                 ]);
             }
@@ -54,21 +53,21 @@ class DenyGenerator
             $written = file_put_contents($targetPath, $content, LOCK_EX);
 
             if ($written === false) {
-                Log::error('[DenyGenerator.generate] Failed to write config file', [
+                $this->logger->error('[DenyGenerator.generate] Failed to write config file', [
                     'path' => $targetPath,
                 ]);
 
                 return false;
             }
 
-            Log::info('[DenyGenerator.generate] Config file written', [
+            $this->logger->info('[DenyGenerator.generate] Config file written', [
                 'path' => $targetPath,
                 'bytes' => $written,
             ]);
 
             return $this->reloadServer();
         } catch (\Throwable $e) {
-            Log::error('[DenyGenerator.generate] Error generating config', [
+            $this->logger->error('[DenyGenerator.generate] Error generating config', [
                 'path' => $targetPath,
                 'error' => $e->getMessage(),
             ]);
@@ -82,7 +81,7 @@ class DenyGenerator
      */
     private function reloadServer(): bool
     {
-        Log::info('[DenyGenerator.reloadServer] Reloading server', [
+        $this->logger->info('[DenyGenerator.reloadServer] Reloading server', [
             'command' => $this->reloadCommand,
         ]);
 
@@ -92,9 +91,9 @@ class DenyGenerator
         exec($this->reloadCommand, $output, $exitCode);
 
         if ($exitCode === 0) {
-            Log::info('[DenyGenerator.reloadServer] Server reloaded successfully');
+            $this->logger->info('[DenyGenerator.reloadServer] Server reloaded successfully');
         } else {
-            Log::error('[DenyGenerator.reloadServer] Server reload failed', [
+            $this->logger->error('[DenyGenerator.reloadServer] Server reload failed', [
                 'exit_code' => $exitCode,
                 'output' => implode("\n", $output),
             ]);

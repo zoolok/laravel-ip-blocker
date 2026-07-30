@@ -2,7 +2,8 @@
 
 namespace Zoolok\IpBlocker\Services;
 
-use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Zoolok\IpBlocker\Contracts\LogParserInterface;
 use Zoolok\IpBlocker\Contracts\LogParserStrategy;
 use Zoolok\IpBlocker\Contracts\ParsedRequest;
@@ -28,6 +29,7 @@ class LogParser implements LogParserInterface
 
     public function __construct(
         private readonly string $logFormat = 'auto',
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {
         $this->strategy = $this->resolveStrategy($logFormat);
     }
@@ -35,16 +37,16 @@ class LogParser implements LogParserInterface
     public function parse(string $filePath, bool $fromBeginning = false): \Generator
     {
         if (! file_exists($filePath) || ! is_readable($filePath)) {
-            Log::error('[LogParser.parse] Log file not found or not readable', [
+            $this->logger->error('[LogParser.parse] Log file not found or not readable', [
                 'path' => $filePath,
             ]);
 
             throw new \RuntimeException("Log file not found or not readable: {$filePath}");
         }
 
-        $handle = fopen($filePath, 'r');
+        $handle = @fopen($filePath, 'r');
         if ($handle === false) {
-            Log::error('[LogParser.parse] Cannot open log file', [
+            $this->logger->error('[LogParser.parse] Cannot open log file', [
                 'path' => $filePath,
             ]);
 
@@ -63,7 +65,7 @@ class LogParser implements LogParserInterface
             fseek($handle, $startPosition);
         }
 
-        Log::info('[LogParser.parse] Starting log parsing', [
+        $this->logger->info('[LogParser.parse] Starting log parsing', [
             'path' => $filePath,
             'format' => $this->detectedFormat,
             'start_position' => $startPosition,
@@ -85,7 +87,7 @@ class LogParser implements LogParserInterface
 
                 if ($parsed !== null) {
                     $suspiciousCount++;
-                    Log::debug('[LogParser.parse] Found suspicious request', [
+                    $this->logger->debug('[LogParser.parse] Found suspicious request', [
                         'ip' => $parsed->ip,
                         'url' => $parsed->url,
                         'method' => $parsed->method,
@@ -95,7 +97,7 @@ class LogParser implements LogParserInterface
                     yield $parsed;
                 }
             } catch (\Throwable $e) {
-                Log::warning('[LogParser.parse] Failed to parse line', [
+                $this->logger->warning('[LogParser.parse] Failed to parse line', [
                     'line' => $lineNumber,
                     'error' => $e->getMessage(),
                 ]);
@@ -107,7 +109,7 @@ class LogParser implements LogParserInterface
 
         $this->savePosition($filePath, $this->currentPosition);
 
-        Log::info('[LogParser.parse] Parsing complete', [
+        $this->logger->info('[LogParser.parse] Parsing complete', [
             'path' => $filePath,
             'format' => $this->detectedFormat,
             'lines_processed' => $lineNumber,
@@ -137,7 +139,7 @@ class LogParser implements LogParserInterface
         $class = self::FORMAT_MAP[$format] ?? null;
 
         if ($class === null) {
-            Log::warning('[LogParser] Unknown log format, falling back to nginx-combined', [
+            $this->logger->warning('[LogParser] Unknown log format, falling back to nginx-combined', [
                 'requested_format' => $format,
             ]);
             $this->detectedFormat = 'nginx-combined';
@@ -155,7 +157,7 @@ class LogParser implements LogParserInterface
         $firstLine = fgets($handle);
 
         if ($firstLine === false) {
-            Log::warning('[LogParser.autoDetect] Empty log file, defaulting to nginx-combined');
+            $this->logger->warning('[LogParser.autoDetect] Empty log file, defaulting to nginx-combined');
             $this->detectedFormat = 'nginx-combined';
             $this->strategy = new NginxCombinedParser();
 
@@ -177,7 +179,7 @@ class LogParser implements LogParserInterface
                 $this->detectedFormat = $name;
                 $this->strategy = $parser;
 
-                Log::debug('[LogParser.autoDetect] Detected log format', [
+                $this->logger->debug('[LogParser.autoDetect] Detected log format', [
                     'format' => $name,
                     'sample_ip' => $result->ip,
                     'sample_url' => $result->url,
@@ -187,7 +189,7 @@ class LogParser implements LogParserInterface
             }
         }
 
-        Log::warning('[LogParser.autoDetect] Could not detect format, defaulting to nginx-combined', [
+        $this->logger->warning('[LogParser.autoDetect] Could not detect format, defaulting to nginx-combined', [
             'first_line' => substr($firstLine, 0, 200),
         ]);
         $this->detectedFormat = 'nginx-combined';
@@ -201,7 +203,7 @@ class LogParser implements LogParserInterface
         if (file_exists($posFile)) {
             $position = (int) file_get_contents($posFile);
 
-            Log::debug('[LogParser] Loaded position', [
+            $this->logger->debug('[LogParser] Loaded position', [
                 'path' => $posFile,
                 'position' => $position,
             ]);
@@ -216,14 +218,14 @@ class LogParser implements LogParserInterface
     {
         $posFile = $filePath.self::POSITION_FILE_SUFFIX;
 
-        $written = file_put_contents($posFile, (string) $position);
+        $written = @file_put_contents($posFile, (string) $position);
 
         if ($written === false) {
-            Log::warning('[LogParser] Could not save position file', [
+            $this->logger->warning('[LogParser] Could not save position file', [
                 'path' => $posFile,
             ]);
         } else {
-            Log::debug('[LogParser] Saved position', [
+            $this->logger->debug('[LogParser] Saved position', [
                 'path' => $posFile,
                 'position' => $position,
             ]);

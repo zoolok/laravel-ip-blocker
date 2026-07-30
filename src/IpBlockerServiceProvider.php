@@ -4,6 +4,7 @@ namespace Zoolok\IpBlocker;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 use Zoolok\IpBlocker\Commands\BlockCommand;
 use Zoolok\IpBlocker\Commands\ParseLogCommand;
 use Zoolok\IpBlocker\Http\Middleware\TrackSuspiciousIps;
@@ -50,6 +51,7 @@ class IpBlockerServiceProvider extends ServiceProvider
     {
         $this->app->singleton(LogParser::class, fn ($app) => new LogParser(
             logFormat: $app['config']->get('ip-blocker.log_format', 'auto'),
+            logger: $app->make(LoggerInterface::class),
         ));
 
         $this->app->singleton(IpAnalyzer::class, fn ($app) => new IpAnalyzer(
@@ -65,6 +67,7 @@ class IpBlockerServiceProvider extends ServiceProvider
             denyPath: $app['config']->get('ip-blocker.server.deny_path'),
             reloadCommand: $app['config']->get('ip-blocker.server.reload_command'),
             allowOverridePath: $app['config']->get('ip-blocker.server.allow_override_path'),
+            logger: $app->make(LoggerInterface::class),
         ));
 
         $this->app->singleton(ReportService::class, fn ($app) => new ReportService(
@@ -86,6 +89,10 @@ class IpBlockerServiceProvider extends ServiceProvider
     private function registerScheduler(): void
     {
         $this->callAfterResolving('Illuminate\Contracts\Console\Kernel', function ($kernel) {
+            if (! method_exists($kernel, 'getSchedule')) {
+                return;
+            }
+
             $schedule = $kernel->getSchedule();
 
             $reportEnabled = $this->app['config']->get('ip-blocker.report.enabled', true);

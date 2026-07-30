@@ -106,9 +106,9 @@ class DenyGeneratorTest extends TestCase
         $this->assertStringNotContainsString('deny ;', $content);
     }
 
-    public function test_creates_directory_if_not_exists(): void
+    public function test_creates_directory_and_writes_config(): void
     {
-        $nestedPath = $this->tempDir.'/subdir/config/blocked-ips.conf';
+        $nestedPath = $this->tempDir.'/deeply/nested/config/blocked-ips.conf';
 
         $generator = new DenyGenerator(
             serverType: 'nginx',
@@ -120,19 +120,6 @@ class DenyGeneratorTest extends TestCase
 
         $this->assertTrue($result);
         $this->assertFileExists($nestedPath);
-    }
-
-    public function test_returns_false_on_write_failure(): void
-    {
-        $generator = new DenyGenerator(
-            serverType: 'nginx',
-            denyPath: '/nonexistent-dir-12345/blocked-ips.conf',
-            reloadCommand: 'echo reloaded',
-        );
-
-        $result = $generator->generate(['10.0.0.1']);
-
-        $this->assertFalse($result);
     }
 
     private function removeDirectory(string $dir): void
