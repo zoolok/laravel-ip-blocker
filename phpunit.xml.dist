@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.0/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheResult="false"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Parsers</directory>
+            <directory>tests/Services</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory>tests/Middleware</directory>
+            <directory>tests/Commands</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_KEY" value="AckfSECXIvnK5r28GVIWUAxmbBSjTsmF"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="IP_BLOCKER_LOG_LEVEL" value="debug"/>
+    </php>
+</phpunit>
