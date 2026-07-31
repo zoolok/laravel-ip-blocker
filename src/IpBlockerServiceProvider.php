@@ -2,6 +2,7 @@
 
 namespace Zoolok\IpBlocker;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\LoggerInterface;
 use Zoolok\IpBlocker\Commands\BlockCommand;
@@ -102,17 +103,13 @@ class IpBlockerServiceProvider extends ServiceProvider
     /**
      * Register the daily report scheduler.
      *
+     * Uses the schedule resolver so the task works in Laravel 10+.
+     *
      * @return void
      */
     private function registerScheduler(): void
     {
-        $this->callAfterResolving('Illuminate\Contracts\Console\Kernel', function ($kernel) {
-            if (! method_exists($kernel, 'getSchedule')) {
-                return;
-            }
-
-            $schedule = $kernel->getSchedule();
-
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
             $reportEnabled = $this->app['config']->get('ip-blocker.report.enabled', true);
             $reportEmail = $this->app['config']->get('ip-blocker.report.email');
             $scheduleExpression = $this->app['config']->get('ip-blocker.report.schedule', '0 9 * * *');
