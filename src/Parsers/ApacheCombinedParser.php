@@ -17,7 +17,7 @@ use Zoolok\IpBlocker\Contracts\ParsedRequest;
  */
 class ApacheCombinedParser extends AbstractParser
 {
-    private const string APACHE_COMBINED_REGEX = '/^(?P<ip>\S+)\s+-\s+\S+\s+\[(?P<date>[^\]]+)\]\s+"(?P<method>\S+)\s+(?P<url>\S+)\s+\S+"\s+(?P<status>\d{3})\s+\d+\s+"(?P<referer>[^"]*)"\s+"(?P<ua>[^"]*)"/';
+    private const APACHE_COMBINED_REGEX = '/^(?P<ip>\S+)\s+-\s+\S+\s+\[(?P<date>[^\]]+)\]\s+"(?P<method>\S+)\s+(?P<url>\S+)\s+\S+"\s+(?P<status>\d{3})\s+\d+\s+"(?P<referer>[^"]*)"\s+"(?P<ua>[^"]*)"/';
 
     /**
      * Parse a single Apache combined log line.

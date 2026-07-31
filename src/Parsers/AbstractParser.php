@@ -7,7 +7,7 @@ use Zoolok\IpBlocker\Contracts\ParsedRequest;
 
 abstract class AbstractParser implements LogParserStrategy
 {
-    protected const int MIN_SUSPICIOUS_STATUS = 400;
+    protected const MIN_SUSPICIOUS_STATUS = 400;
 
     /**
      * Normalize a URL by removing query string and fragment.

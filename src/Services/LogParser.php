@@ -14,13 +14,13 @@ use Zoolok\IpBlocker\Parsers\NginxCombinedParser;
 
 class LogParser implements LogParserInterface
 {
-    private const array FORMAT_MAP = [
+    private const FORMAT_MAP = [
         'nginx-combined' => NginxCombinedParser::class,
         'apache-common' => ApacheCommonParser::class,
         'apache-combined' => ApacheCombinedParser::class,
     ];
 
-    private const string POSITION_FILE_SUFFIX = '.ip-blocker-pos';
+    private const POSITION_FILE_SUFFIX = '.ip-blocker-pos';
 
     private LogParserStrategy $strategy;
 
