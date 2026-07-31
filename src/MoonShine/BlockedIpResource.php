@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Zoolok\IpBlocker\MoonShine;
 
 use MoonShine\Laravel\Resources\ModelResource;
-use MoonShine\Support\Enums\Action;
 use MoonShine\Support\ListOf;
 use Zoolok\IpBlocker\Models\BlockedIp;
 use Zoolok\IpBlocker\MoonShine\Pages\BlockedIpDetailPage;
@@ -38,10 +37,32 @@ class BlockedIpResource extends ModelResource
     /**
      * Get the allowed actions.
      *
-     * @return ListOf<int, Action> Actions with create and update removed.
+     * Uses the installed version's Action enum. Actions CREATE and UPDATE
+     * are removed so the resource is read-only.
+     *
+     * @return ListOf<\MoonShine\Support\Enums\Action|\MoonShine\Laravel\Enums\Action>
      */
     protected function activeActions(): ListOf
     {
-        return parent::activeActions()->except(Action::CREATE, Action::UPDATE);
+        return parent::activeActions()->except(
+            MoonShineVersion::action('CREATE'),
+            MoonShineVersion::action('UPDATE'),
+        );
+    }
+
+    /**
+     * Get the query tags for quick filtering.
+     *
+     * Works in both MoonShine 3.x (resource-level tags) and 4.x
+     * (resource tags are delegated by the CrudResource).
+     *
+     * @return list<\MoonShine\Crud\QueryTags\QueryTag|\MoonShine\Laravel\QueryTags\QueryTag>
+     */
+    protected function queryTags(): array
+    {
+        return [
+            MoonShineVersion::queryTag('Активные', fn ($query) => $query->where('is_active', true)),
+            MoonShineVersion::queryTag('Истекшие', fn ($query) => $query->where('is_active', false)),
+        ];
     }
 }

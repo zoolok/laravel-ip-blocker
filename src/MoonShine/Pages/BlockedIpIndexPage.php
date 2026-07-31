@@ -51,19 +51,6 @@ class BlockedIpIndexPage extends IndexPage
     }
 
     /**
-     * Get the query tags for quick filtering.
-     *
-     * @return array<string, callable(Builder): Builder>
-     */
-    protected function queryTags(): array
-    {
-        return [
-            'Активные' => fn ($query) => $query->where('is_active', true),
-            'Истекшие' => fn ($query) => $query->where('is_active', false),
-        ];
-    }
-
-    /**
      * Modify the list component before rendering.
      *
      * @param ComponentContract $component Component to modify.
