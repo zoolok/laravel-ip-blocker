@@ -3,7 +3,7 @@
 namespace Zoolok\IpBlocker\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use Zoolok\IpBlocker\Contracts\SuspiciousIpData;
 use Zoolok\IpBlocker\Models\BlockedIp;
 use Zoolok\IpBlocker\Services\DenyGenerator;
 use Zoolok\IpBlocker\Services\IpAnalyzer;
@@ -20,6 +20,16 @@ class BlockCommand extends Command
 
     protected $description = 'Analyze suspicious requests and block malicious IPs';
 
+    /**
+     * Execute the console command.
+     *
+     * Blocks a specific IP when --ip is given, otherwise analyzes all
+     * suspicious requests and blocks the offending IPs.
+     *
+     * @param IpAnalyzer $analyzer IP analysis service.
+     * @param DenyGenerator $denyGenerator Web server deny config generator.
+     * @return int Command exit code (SUCCESS or FAILURE).
+     */
     public function handle(IpAnalyzer $analyzer, DenyGenerator $denyGenerator): int
     {
         $specificIp = $this->option('ip');
@@ -38,6 +48,18 @@ class BlockCommand extends Command
 
     /**
      * Block a specific IP address.
+     *
+     * Checks whether the IP is already blocked, analyzes it, displays the
+     * results, and creates a block record (unless running in dry-run mode
+     * or the user cancels the confirmation prompt).
+     *
+     * @param IpAnalyzer $analyzer IP analysis service.
+     * @param string $ip IP address to block.
+     * @param string|null $customReason Optional custom blocking reason.
+     * @param string|null $customDuration Optional block duration in minutes.
+     * @param bool $dryRun If true, do not create the block record.
+     * @param bool $force If true, skip the confirmation prompt.
+     * @return int Command exit code.
      */
     private function blockSpecificIp(
         IpAnalyzer $analyzer,
@@ -47,6 +69,12 @@ class BlockCommand extends Command
         bool $dryRun,
         bool $force = false,
     ): int {
+        if (filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            $this->error("Invalid IP address: {$ip}");
+
+            return self::FAILURE;
+        }
+
         $this->components->info("Checking IP: {$ip}");
 
         $existing = BlockedIp::active()->where('ip', $ip)->first();
@@ -93,6 +121,18 @@ class BlockCommand extends Command
 
     /**
      * Analyze all IPs and block suspicious ones.
+     *
+     * Runs a full analysis, presents the results, prompts for confirmation,
+     * blocks the confirmed IPs, and optionally regenerates the web server
+     * deny configuration.
+     *
+     * @param IpAnalyzer $analyzer IP analysis service.
+     * @param DenyGenerator $denyGenerator Web server deny config generator.
+     * @param bool $dryRun If true, do not create any block records.
+     * @param bool $force If true, skip confirmation prompts.
+     * @param bool $noNginx If true, skip web server deny config regeneration.
+     * @param string|null $customDuration Optional block duration in minutes.
+     * @return int Command exit code.
      */
     private function analyzeAndBlock(
         IpAnalyzer $analyzer,
@@ -110,8 +150,6 @@ class BlockCommand extends Command
 
         if (count($suspiciousIps) === 0) {
             $this->components->info('No suspicious IPs found.');
-
-            Log::info('[BlockCommand] No suspicious IPs found during analysis');
 
             return self::SUCCESS;
         }
@@ -154,19 +192,16 @@ class BlockCommand extends Command
             ], $suspiciousIps),
         );
 
-        Log::info('[BlockCommand] Analysis and blocking complete', [
-            'suspicious_found' => count($suspiciousIps),
-            'blocked' => count($blockedIps),
-            'dry_run' => $dryRun,
-        ]);
-
         return self::SUCCESS;
     }
 
     /**
      * Display IP analysis information.
+     *
+     * @param SuspiciousIpData $data Statistics of the IP being analyzed.
+     * @return void
      */
-    private function displayIpInfo(\Zoolok\IpBlocker\Contracts\SuspiciousIpData $data): void
+    private function displayIpInfo(SuspiciousIpData $data): void
     {
         $this->components->twoColumnDetail('IP', $data->ip);
         $this->components->twoColumnDetail('Total requests', (string) $data->totalRequests);
@@ -182,7 +217,15 @@ class BlockCommand extends Command
     }
 
     /**
-     * Confirm blocking an IP.
+     * Confirm blocking an IP address.
+     *
+     * Returns true without prompting when running in dry-run mode, with
+     * --force, or when the input is not interactive.
+     *
+     * @param string $ip IP address to confirm blocking.
+     * @param bool $dryRun Whether dry-run mode is active.
+     * @param bool $force Whether the confirmation should be skipped.
+     * @return bool True when the block is confirmed.
      */
     private function confirmBlock(string $ip, bool $dryRun, bool $force): bool
     {
@@ -195,6 +238,12 @@ class BlockCommand extends Command
 
     /**
      * Create a blocked IP record.
+     *
+     * @param string $ip IP address to block.
+     * @param string $reason Blocking reason.
+     * @param string $blockedBy Source of the block ('command' or 'auto').
+     * @param string|null $customDuration Optional block duration in minutes.
+     * @return void
      */
     private function createBlock(string $ip, string $reason, string $blockedBy, ?string $customDuration): void
     {

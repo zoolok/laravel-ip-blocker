@@ -3,7 +3,6 @@
 namespace Zoolok\IpBlocker;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Log;
 use Psr\Log\LoggerInterface;
 use Zoolok\IpBlocker\Commands\BlockCommand;
 use Zoolok\IpBlocker\Commands\ParseLogCommand;
@@ -16,19 +15,29 @@ use Zoolok\IpBlocker\Services\ReportService;
 
 class IpBlockerServiceProvider extends ServiceProvider
 {
-    private const string PACKAGE_VERSION = '1.0.0';
+    private const PACKAGE_VERSION = '1.0.0';
 
+    /**
+     * Register package services and merge its configuration.
+     *
+     * @return void
+     */
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/ip-blocker.php', 'ip-blocker');
 
         $this->registerServices();
-
-        Log::debug('[IpBlockerServiceProvider.register] Package registered', [
-            'version' => self::PACKAGE_VERSION,
-        ]);
     }
 
+    /**
+     * Bootstrap the package.
+     *
+     * Loads migrations and views, registers the middleware alias and the
+     * MoonShine resource, and (in console) publishes assets, registers
+     * commands and the scheduler.
+     *
+     * @return void
+     */
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
@@ -41,12 +50,13 @@ class IpBlockerServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'ip-blocker');
         $this->registerMiddleware();
         $this->registerMoonShineResource();
-
-        Log::debug('[IpBlockerServiceProvider.boot] Package booted', [
-            'version' => self::PACKAGE_VERSION,
-        ]);
     }
 
+    /**
+     * Register the package services as singletons.
+     *
+     * @return void
+     */
     private function registerServices(): void
     {
         $this->app->singleton(LogParser::class, fn ($app) => new LogParser(
@@ -76,16 +86,24 @@ class IpBlockerServiceProvider extends ServiceProvider
         ));
     }
 
+    /**
+     * Register the package console commands.
+     *
+     * @return void
+     */
     private function registerCommands(): void
     {
         $this->commands([
             ParseLogCommand::class,
             BlockCommand::class,
         ]);
-
-        Log::debug('[IpBlockerServiceProvider] Commands registered');
     }
 
+    /**
+     * Register the daily report scheduler.
+     *
+     * @return void
+     */
     private function registerScheduler(): void
     {
         $this->callAfterResolving('Illuminate\Contracts\Console\Kernel', function ($kernel) {
@@ -104,24 +122,25 @@ class IpBlockerServiceProvider extends ServiceProvider
                     $reportService = $this->app->make(ReportService::class);
                     $reportService->sendDailyReport();
                 })->cron($scheduleExpression)->name('ip-blocker:daily-report');
-
-                Log::debug('[IpBlockerServiceProvider] Daily report scheduled', [
-                    'cron' => $scheduleExpression,
-                    'email' => $reportEmail,
-                ]);
-            } elseif ($reportEnabled && ! $reportEmail) {
-                Log::warning('[IpBlockerServiceProvider] Report enabled but no email configured. Set IP_BLOCKER_REPORT_EMAIL.');
             }
         });
     }
 
+    /**
+     * Register the suspicious-ip middleware alias.
+     *
+     * @return void
+     */
     private function registerMiddleware(): void
     {
         $this->app['router']->aliasMiddleware('suspicious-ip', TrackSuspiciousIps::class);
-
-        Log::debug('[IpBlockerServiceProvider] Middleware alias registered: suspicious-ip');
     }
 
+    /**
+     * Register the MoonShine resource when enabled and installed.
+     *
+     * @return void
+     */
     private function registerMoonShineResource(): void
     {
         $moonshineEnabled = $this->app['config']->get('ip-blocker.moonshine.enabled', false);
@@ -131,8 +150,6 @@ class IpBlockerServiceProvider extends ServiceProvider
         }
 
         if (! class_exists(\MoonShine\Laravel\DependencyInjection\MoonShineConfigurator::class)) {
-            Log::warning('[IpBlockerServiceProvider] MoonShine not installed. Install moonshine/moonshine or disable moonshine in config.');
-
             return;
         }
 
@@ -140,11 +157,14 @@ class IpBlockerServiceProvider extends ServiceProvider
             $core->resources([
                 BlockedIpResource::class,
             ]);
-
-            Log::debug('[IpBlockerServiceProvider] MoonShine resource registered: BlockedIpResource');
         });
     }
 
+    /**
+     * Register publishable package assets.
+     *
+     * @return void
+     */
     private function publishAssets(): void
     {
         $this->publishes([
@@ -158,7 +178,5 @@ class IpBlockerServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../resources/views' => resource_path('views/vendor/ip-blocker'),
         ], 'ip-blocker-views');
-
-        Log::debug('[IpBlockerServiceProvider] Publishable assets registered');
     }
 }

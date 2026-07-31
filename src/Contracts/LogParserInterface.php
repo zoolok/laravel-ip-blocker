@@ -2,6 +2,8 @@
 
 namespace Zoolok\IpBlocker\Contracts;
 
+use Generator;
+
 interface LogParserInterface
 {
     /**
@@ -9,9 +11,9 @@ interface LogParserInterface
      *
      * @param string $filePath Absolute path to the log file.
      * @param bool $fromBeginning If true, ignore saved position and parse from start.
-     * @return \Generator<int, ParsedRequest>
+     * @return Generator<int, ParsedRequest>
      */
-    public function parse(string $filePath, bool $fromBeginning = false): \Generator;
+    public function parse(string $filePath, bool $fromBeginning = false): Generator;
 
     /**
      * Get the name of the detected/configured format.

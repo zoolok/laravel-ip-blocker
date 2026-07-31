@@ -17,6 +17,12 @@ class NginxCombinedParser extends AbstractParser
 {
     private const string NGINX_COMBINED_REGEX = '/^(?P<ip>\S+)\s+-\s+\S+\s+\[(?P<date>[^\]]+)\]\s+"(?P<method>\S+)\s+(?P<url>\S+)\s+\S+"\s+(?P<status>\d{3})\s+\d+\s+"(?P<referer>[^"]*)"\s+"(?P<ua>[^"]*)"/';
 
+    /**
+     * Parse a single nginx combined log line.
+     *
+     * @param string $line A single line from the log file.
+     * @return ParsedRequest|null Parsed request data, or null when the line does not match or is not suspicious.
+     */
     public function parseLine(string $line): ?ParsedRequest
     {
         if (trim($line) === '') {

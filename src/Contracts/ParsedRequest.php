@@ -2,16 +2,18 @@
 
 namespace Zoolok\IpBlocker\Contracts;
 
+use Illuminate\Support\Carbon;
+
 class ParsedRequest
 {
     /**
-     * @param string $ip Client IP address.
-     * @param string $url Request URL path.
-     * @param string $method HTTP method (GET, POST, etc.).
-     * @param int $statusCode HTTP response status code.
-     * @param string|null $userAgent User-Agent header value.
-     * @param string|null $referer Referer header value.
-     * @param \Illuminate\Support\Carbon|null $timestamp Request timestamp.
+     * @param string      $ip         Client IP address.
+     * @param string      $url        Request URL path.
+     * @param string      $method     HTTP method (GET, POST, etc.).
+     * @param int         $statusCode HTTP response status code.
+     * @param string|null $userAgent  User-Agent header value.
+     * @param string|null $referer    Referer header value.
+     * @param Carbon|null $timestamp  Request timestamp.
      */
     public function __construct(
         public readonly string $ip,
@@ -20,6 +22,6 @@ class ParsedRequest
         public readonly int $statusCode,
         public readonly ?string $userAgent = null,
         public readonly ?string $referer = null,
-        public readonly ?\Illuminate\Support\Carbon $timestamp = null,
+        public readonly ?Carbon $timestamp = null,
     ) {}
 }

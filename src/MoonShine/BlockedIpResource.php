@@ -22,6 +22,11 @@ class BlockedIpResource extends ModelResource
 
     protected string $column = 'ip';
 
+    /**
+     * Get the list of pages for the resource.
+     *
+     * @return array<int, class-string>
+     */
     protected function pages(): array
     {
         return [
@@ -30,6 +35,11 @@ class BlockedIpResource extends ModelResource
         ];
     }
 
+    /**
+     * Get the allowed actions.
+     *
+     * @return ListOf<int, Action> Actions with create and update removed.
+     */
     protected function activeActions(): ListOf
     {
         return parent::activeActions()->except(Action::CREATE, Action::UPDATE);

@@ -2,13 +2,20 @@
 
 namespace Zoolok\IpBlocker\Services;
 
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Carbon;
 use Zoolok\IpBlocker\Contracts\SuspiciousIpData;
 use Zoolok\IpBlocker\Models\BlockedIp;
 use Zoolok\IpBlocker\Models\SuspiciousRequest;
 
 class IpAnalyzer
 {
+    /**
+     * @param int $analysisWindow Analysis window length in minutes.
+     * @param int $max404 Maximum allowed 404 responses within the window.
+     * @param int $maxRequests Maximum allowed total requests within the window.
+     * @param int $maxUniqueUrls Maximum allowed unique URLs requested.
+     * @param int $blockDuration Default block duration in minutes (0 = permanent).
+     */
     public function __construct(
         private readonly int $analysisWindow = 5,
         private readonly int $max404 = 10,
@@ -18,24 +25,18 @@ class IpAnalyzer
     ) {}
 
     /**
-     * Analyze suspicious requests and return IPs that exceed thresholds.
+     * Analyze all suspicious requests and return per-IP statistics.
      *
-     * @return array<int, SuspiciousIpData>
+     * Groups recent suspicious requests by IP, skips IPs that are already
+     * actively blocked, and produces a {@see SuspiciousIpData} entry for
+     * every remaining IP with its counters and blocking reasons.
+     *
+     * @return array<int, SuspiciousIpData> Statistics for every analyzed IP.
      */
     public function analyze(): array
     {
         $windowStart = now()->subMinutes($this->analysisWindow);
         $windowEnd = now();
-
-        Log::info('[IpAnalyzer.analyze] Starting analysis', [
-            'window_from' => $windowStart->toIso8601String(),
-            'window_to' => $windowEnd->toIso8601String(),
-            'thresholds' => [
-                'max_404' => $this->max404,
-                'max_requests' => $this->maxRequests,
-                'max_unique_urls' => $this->maxUniqueUrls,
-            ],
-        ]);
 
         $requests = SuspiciousRequest::forPeriod($windowStart, $windowEnd)
             ->get();
@@ -48,10 +49,6 @@ class IpAnalyzer
 
         foreach ($grouped as $ip => $ipRequests) {
             if (in_array($ip, $alreadyBlockedIps, true)) {
-                Log::debug('[IpAnalyzer.analyze] Skipping already blocked IP', [
-                    'ip' => $ip,
-                ]);
-
                 continue;
             }
 
@@ -76,59 +73,33 @@ class IpAnalyzer
                 $reasons[] = "Too many unique URLs: {$uniqueUrls} (limit: {$this->maxUniqueUrls})";
             }
 
-            $isSuspicious = count($reasons) > 0;
-
-            if ($isSuspicious) {
-                Log::info('[IpAnalyzer.analyze] Suspicious IP detected', [
-                    'ip' => $ip,
-                    'total_requests' => $totalRequests,
-                    'not_found' => $notFoundCount,
-                    'unique_urls' => $uniqueUrls,
-                    'req_per_min' => $requestsPerMinute,
-                    'reasons' => $reasons,
-                ]);
-            } else {
-                Log::debug('[IpAnalyzer.analyze] IP within limits', [
-                    'ip' => $ip,
-                    'total_requests' => $totalRequests,
-                    'not_found' => $notFoundCount,
-                    'unique_urls' => $uniqueUrls,
-                    'req_per_min' => $requestsPerMinute,
-                ]);
-            }
-
             $results[] = new SuspiciousIpData(
                 ip: $ip,
                 totalRequests: $totalRequests,
                 notFoundCount: $notFoundCount,
                 uniqueUrls: $uniqueUrls,
                 requestsPerMinute: $requestsPerMinute,
-                isSuspicious: $isSuspicious,
+                isSuspicious: count($reasons) > 0,
                 reasons: $reasons,
             );
         }
-
-        $suspiciousCount = count(array_filter($results, fn (SuspiciousIpData $d) => $d->isSuspicious));
-
-        Log::info('[IpAnalyzer.analyze] Analysis complete', [
-            'total_ips_analyzed' => count($results),
-            'suspicious_ips_found' => $suspiciousCount,
-            'already_blocked_skipped' => count($alreadyBlockedIps),
-        ]);
 
         return $results;
     }
 
     /**
      * Analyze a single IP address.
+     *
+     * Evaluates the IP against the configured thresholds using its recent
+     * suspicious requests. Returns null when the IP is already actively
+     * blocked.
+     *
+     * @param string $ip The IP address to analyze.
+     * @return SuspiciousIpData|null Statistics for the IP, or null when it is already blocked.
      */
     public function analyzeIp(string $ip): ?SuspiciousIpData
     {
         if (BlockedIp::active()->where('ip', $ip)->exists()) {
-            Log::debug('[IpAnalyzer.analyzeIp] IP is already blocked', [
-                'ip' => $ip,
-            ]);
-
             return null;
         }
 
@@ -139,10 +110,6 @@ class IpAnalyzer
             ->get();
 
         if ($ipRequests->isEmpty()) {
-            Log::debug('[IpAnalyzer.analyzeIp] No recent requests for IP', [
-                'ip' => $ip,
-            ]);
-
             return new SuspiciousIpData(
                 ip: $ip,
                 totalRequests: 0,
@@ -186,8 +153,10 @@ class IpAnalyzer
 
     /**
      * Calculate the blocking expiration time.
+     *
+     * @return Carbon|null Expiration timestamp, or null when the block is permanent or the duration is not positive.
      */
-    public function getBlockExpiration(): ?\Illuminate\Support\Carbon
+    public function getBlockExpiration(): ?Carbon
     {
         if ($this->blockDuration <= 0) {
             return null;

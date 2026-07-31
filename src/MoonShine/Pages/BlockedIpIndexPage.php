@@ -6,7 +6,6 @@ namespace Zoolok\IpBlocker\MoonShine\Pages;
 
 use MoonShine\Contracts\UI\ComponentContract;
 use MoonShine\Laravel\Pages\Crud\IndexPage;
-use MoonShine\UI\Components\ActionButton;
 use MoonShine\UI\Fields\Checkbox;
 use MoonShine\UI\Fields\Date;
 use MoonShine\UI\Fields\ID;
@@ -18,6 +17,11 @@ use Zoolok\IpBlocker\Models\BlockedIp;
  */
 class BlockedIpIndexPage extends IndexPage
 {
+    /**
+     * Get the index page table fields.
+     *
+     * @return iterable<int, FieldContract>
+     */
     protected function fields(): iterable
     {
         return [
@@ -31,6 +35,11 @@ class BlockedIpIndexPage extends IndexPage
         ];
     }
 
+    /**
+     * Get the filter fields.
+     *
+     * @return iterable<int, FieldContract>
+     */
     protected function filters(): iterable
     {
         return [
@@ -41,6 +50,11 @@ class BlockedIpIndexPage extends IndexPage
         ];
     }
 
+    /**
+     * Get the query tags for quick filtering.
+     *
+     * @return array<string, callable(Builder): Builder>
+     */
     protected function queryTags(): array
     {
         return [
@@ -49,6 +63,12 @@ class BlockedIpIndexPage extends IndexPage
         ];
     }
 
+    /**
+     * Modify the list component before rendering.
+     *
+     * @param ComponentContract $component Component to modify.
+     * @return ComponentContract Modified component.
+     */
     protected function modifyListComponent(ComponentContract $component): ComponentContract
     {
         return $component;

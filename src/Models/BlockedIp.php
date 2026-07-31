@@ -4,7 +4,7 @@ namespace Zoolok\IpBlocker\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -24,6 +24,9 @@ class BlockedIp extends Model
 {
     protected $guarded = ['id'];
 
+    /**
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
@@ -33,13 +36,21 @@ class BlockedIp extends Model
         ];
     }
 
-    public function suspiciousRequests()
+    /**
+     * Get the suspicious requests recorded for the same IP.
+     *
+     * @return HasMany<SuspiciousRequest, $this>
+     */
+    public function suspiciousRequests(): HasMany
     {
         return $this->hasMany(SuspiciousRequest::class, 'ip', 'ip');
     }
 
     /**
      * Scope: только активные блокировки (is_active = true и срок не истёк).
+     *
+     * @param Builder<BlockedIp> $query
+     * @return void
      */
     public function scopeActive(Builder $query): void
     {
@@ -52,33 +63,13 @@ class BlockedIp extends Model
 
     /**
      * Scope: блокировки для указанного IP.
+     *
+     * @param Builder<BlockedIp> $query
+     * @param string $ip
+     * @return void
      */
     public function scopeForIp(Builder $query, string $ip): void
     {
         $query->where('ip', $ip);
-    }
-
-    protected static function booted(): void
-    {
-        static::created(function (BlockedIp $blocked) {
-            Log::info('[BlockedIp.created] IP blocked', [
-                'ip' => $blocked->ip,
-                'reason' => $blocked->reason,
-                'blocked_by' => $blocked->blocked_by,
-                'expires_at' => $blocked->expires_at?->toIso8601String(),
-                'duration_minutes' => $blocked->expires_at
-                    ? now()->diffInMinutes($blocked->expires_at)
-                    : null,
-            ]);
-        });
-
-        static::updated(function (BlockedIp $blocked) {
-            if ($blocked->isDirty('is_active') && $blocked->is_active === false) {
-                Log::info('[BlockedIp.updated] IP unblocked', [
-                    'ip' => $blocked->ip,
-                    'reason' => $blocked->reason,
-                ]);
-            }
-        });
     }
 }

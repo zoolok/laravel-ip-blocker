@@ -23,6 +23,16 @@ class ParseLogCommand extends Command
 
     private int $skippedCount = 0;
 
+    /**
+     * Execute the console command.
+     *
+     * Parses the access log, shows a progress bar, saves detected suspicious
+     * requests to the database in batches of 100 (unless --dry-run), and
+     * prints a summary.
+     *
+     * @param LogParser $logParser Log parser service.
+     * @return int Command exit code (SUCCESS or FAILURE).
+     */
     public function handle(LogParser $logParser): int
     {
         $filePath = $this->option('path') ?? config('ip-blocker.log_path');
@@ -43,13 +53,6 @@ class ParseLogCommand extends Command
         }
 
         $this->components->info("Parsing log file: {$filePath}");
-
-        Log::info('[ParseLogCommand.handle] Starting', [
-            'path' => $filePath,
-            'format' => $format,
-            'dry_run' => $dryRun,
-            'from_beginning' => $fromBeginning,
-        ]);
 
         $parser = new LogParser(logFormat: $format);
 
@@ -104,15 +107,6 @@ class ParseLogCommand extends Command
             } else {
                 $this->components->twoColumnDetail('Dry run', 'No records saved');
             }
-
-            Log::info('[ParseLogCommand.handle] Completed', [
-                'path' => $filePath,
-                'format' => $detectedFormat,
-                'found' => $this->foundCount,
-                'saved' => $this->savedCount,
-                'skipped' => $this->skippedCount,
-                'dry_run' => $dryRun,
-            ]);
         } catch (\Throwable $e) {
             $bar->finish();
             $this->newLine();
@@ -131,7 +125,12 @@ class ParseLogCommand extends Command
     }
 
     /**
-     * @param array<int, array<string, mixed>> $chunk
+     * Save a chunk of parsed records to the database.
+     *
+     * Inserts each record individually and counts skipped duplicates.
+     *
+     * @param array<int, array<string, mixed>> $chunk Batch of records to insert.
+     * @return void
      */
     private function saveChunk(array $chunk): void
     {
@@ -141,13 +140,8 @@ class ParseLogCommand extends Command
             try {
                 SuspiciousRequest::query()->create($record);
                 $inserted++;
-            } catch (\Throwable $e) {
+            } catch (\Throwable) {
                 $this->skippedCount++;
-                Log::warning('[ParseLogCommand] Skipping duplicate record', [
-                    'ip' => $record['ip'],
-                    'url' => $record['url'],
-                    'error' => $e->getMessage(),
-                ]);
             }
         }
 

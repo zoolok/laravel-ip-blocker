@@ -11,8 +11,6 @@ use MoonShine\UI\Fields\Date;
 use MoonShine\UI\Fields\ID;
 use MoonShine\UI\Fields\Text;
 use MoonShine\UI\Fields\Textarea;
-use MoonShine\UI\Components\ActionButton;
-use Illuminate\Support\Facades\Log;
 use Zoolok\IpBlocker\Models\BlockedIp;
 
 /**
@@ -20,6 +18,11 @@ use Zoolok\IpBlocker\Models\BlockedIp;
  */
 class BlockedIpDetailPage extends DetailPage
 {
+    /**
+     * Get the detail page fields.
+     *
+     * @return iterable<int, FieldContract>
+     */
     protected function fields(): iterable
     {
         return [
@@ -33,6 +36,12 @@ class BlockedIpDetailPage extends DetailPage
         ];
     }
 
+    /**
+     * Modify the detail component before rendering.
+     *
+     * @param ComponentContract $component Component to modify.
+     * @return ComponentContract Modified component.
+     */
     protected function modifyDetailComponent(ComponentContract $component): ComponentContract
     {
         return $component;

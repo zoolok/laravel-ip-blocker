@@ -59,4 +59,29 @@ class TrackSuspiciousIpsIntegrationTest extends TestCase
 
         $this->assertEquals(2, $count);
     }
+
+    public function test_blocked_ip_gets_403_before_processing(): void
+    {
+        $processed = false;
+
+        $this->app['router']->get('/protected', function () use (&$processed) {
+            $processed = true;
+
+            return response('OK', 200);
+        })->middleware('suspicious-ip');
+
+        \Zoolok\IpBlocker\Models\BlockedIp::query()->create([
+            'ip' => '10.0.0.1',
+            'reason' => 'Test block',
+            'blocked_by' => 'test',
+            'blocked_at' => now(),
+            'expires_at' => now()->addHour(),
+            'is_active' => true,
+        ]);
+
+        $response = $this->get('/protected', ['REMOTE_ADDR' => '10.0.0.1']);
+
+        $response->assertStatus(403);
+        $this->assertFalse($processed, 'Route handler must not run for a blocked IP');
+    }
 }

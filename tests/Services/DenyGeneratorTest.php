@@ -106,6 +106,33 @@ class DenyGeneratorTest extends TestCase
         $this->assertStringNotContainsString('deny ;', $content);
     }
 
+    public function test_skips_invalid_ips_when_generating_config(): void
+    {
+        $denyPath = $this->tempDir.'/blocked-ips.conf';
+
+        $generator = new DenyGenerator(
+            serverType: 'nginx',
+            denyPath: $denyPath,
+            reloadCommand: 'echo reloaded',
+        );
+
+        $result = $generator->generate([
+            '10.0.0.1',
+            'not-an-ip',
+            '192.168.1.1; include /etc/passwd;',
+            '::1',
+        ]);
+
+        $this->assertTrue($result);
+
+        $content = file_get_contents($denyPath);
+
+        $this->assertStringContainsString('deny 10.0.0.1;', $content);
+        $this->assertStringContainsString('deny ::1;', $content);
+        $this->assertStringNotContainsString('not-an-ip', $content);
+        $this->assertStringNotContainsString('include /etc/passwd', $content);
+    }
+
     public function test_creates_directory_and_writes_config(): void
     {
         $nestedPath = $this->tempDir.'/deeply/nested/config/blocked-ips.conf';

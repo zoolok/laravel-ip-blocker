@@ -11,6 +11,9 @@ abstract class AbstractParser implements LogParserStrategy
 
     /**
      * Normalize a URL by removing query string and fragment.
+     *
+     * @param string $url Raw URL from the log line.
+     * @return string URL without query string and fragment.
      */
     protected function normalizeUrl(string $url): string
     {
@@ -23,6 +26,9 @@ abstract class AbstractParser implements LogParserStrategy
 
     /**
      * Check if the status code indicates a suspicious request.
+     *
+     * @param int $statusCode HTTP response status code.
+     * @return bool True when the status code is >= 400.
      */
     protected function isSuspiciousStatus(int $statusCode): bool
     {
@@ -31,6 +37,9 @@ abstract class AbstractParser implements LogParserStrategy
 
     /**
      * Parse a timestamp string from a log line into a Carbon instance.
+     *
+     * @param string|null $dateString Raw timestamp from the log line.
+     * @return \Illuminate\Support\Carbon|null Parsed timestamp, or null when unparseable.
      */
     protected function parseTimestamp(?string $dateString): ?\Illuminate\Support\Carbon
     {
@@ -51,6 +60,9 @@ abstract class AbstractParser implements LogParserStrategy
 
     /**
      * Validate that a string looks like a valid IPv4 or IPv6 address.
+     *
+     * @param string $ip Candidate IP address.
+     * @return bool True when the string is a valid IP address.
      */
     protected function isValidIp(string $ip): bool
     {
@@ -60,7 +72,11 @@ abstract class AbstractParser implements LogParserStrategy
     /**
      * Build a ParsedRequest from matched regex groups.
      *
+     * Returns null when the IP is invalid or the status code is not
+     * suspicious.
+     *
      * @param array<string, string> $matches Named regex matches.
+     * @return ParsedRequest|null Parsed request data, or null when not applicable.
      */
     protected function makeRequest(array $matches): ?ParsedRequest
     {

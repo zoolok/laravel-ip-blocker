@@ -9,10 +9,18 @@ use Zoolok\IpBlocker\Contracts\ReportData;
 
 class DailyReportMail extends Mailable
 {
+    /**
+     * @param ReportData $reportData Aggregated report statistics.
+     */
     public function __construct(
         public readonly ReportData $reportData,
     ) {}
 
+    /**
+     * Get the message envelope.
+     *
+     * @return Envelope Envelope with the report subject.
+     */
     public function envelope(): Envelope
     {
         return new Envelope(
@@ -20,6 +28,11 @@ class DailyReportMail extends Mailable
         );
     }
 
+    /**
+     * Get the message content definition.
+     *
+     * @return Content Content definition referencing the report view.
+     */
     public function content(): Content
     {
         return new Content(

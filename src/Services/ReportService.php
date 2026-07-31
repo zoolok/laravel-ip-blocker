@@ -11,6 +11,10 @@ use Zoolok\IpBlocker\Models\SuspiciousRequest;
 
 class ReportService
 {
+    /**
+     * @param int $retentionDays Number of days to keep records before cleanup.
+     * @param bool $cleanupEnabled Whether old records should be deleted after sending the report.
+     */
     public function __construct(
         private readonly int $retentionDays = 30,
         private readonly bool $cleanupEnabled = true,
@@ -18,15 +22,16 @@ class ReportService
 
     /**
      * Generate a daily report and send it via email.
+     *
+     * Builds the report data, optionally cleans up old records, and sends
+     * the report to the configured email address. Errors are logged.
+     *
+     * @return void
      */
     public function sendDailyReport(): void
     {
-        Log::info('[ReportService.sendDailyReport] Generating daily report');
-
         try {
             $reportData = $this->generateReportData();
-
-            $this->logReportData($reportData);
 
             if ($this->cleanupEnabled) {
                 $this->cleanupOldRecords();
@@ -35,16 +40,10 @@ class ReportService
             $email = config('ip-blocker.report.email');
 
             if ($email === null || $email === '') {
-                Log::warning('[ReportService.sendDailyReport] Report email not configured');
-
                 return;
             }
 
             Mail::to($email)->send(new DailyReportMail($reportData));
-
-            Log::info('[ReportService.sendDailyReport] Report sent', [
-                'email' => $email,
-            ]);
         } catch (\Throwable $e) {
             Log::error('[ReportService.sendDailyReport] Failed to send report', [
                 'error' => $e->getMessage(),
@@ -55,6 +54,11 @@ class ReportService
 
     /**
      * Generate report data for the last 24 hours.
+     *
+     * Aggregates suspicious request and blocking statistics, including top
+     * IPs and targeted URLs, into a single {@see ReportData} object.
+     *
+     * @return ReportData Aggregated report statistics.
      */
     public function generateReportData(): ReportData
     {
@@ -119,37 +123,15 @@ class ReportService
     }
 
     /**
-     * Delete records older than retention days.
+     * Delete records older than the retention period.
+     *
+     * @return void
      */
     private function cleanupOldRecords(): void
     {
         $cutoff = now()->subDays($this->retentionDays);
 
-        $deletedSuspicious = SuspiciousRequest::where('created_at', '<', $cutoff)->delete();
-        $deletedBlocked = BlockedIp::where('created_at', '<', $cutoff)->delete();
-
-        Log::info('[ReportService.cleanupOldRecords] Cleanup complete', [
-            'cutoff' => $cutoff->toIso8601String(),
-            'deleted_suspicious' => $deletedSuspicious,
-            'deleted_blocked' => $deletedBlocked,
-        ]);
-    }
-
-    /**
-     * Log report data for debugging.
-     */
-    private function logReportData(ReportData $data): void
-    {
-        Log::info('[ReportService] Report data generated', [
-            'total_suspicious' => $data->totalSuspicious,
-            'total_blocked' => $data->totalBlocked,
-            'active_blocks' => $data->activeBlocks,
-            'expired_blocks' => $data->expiredBlocks,
-            'blocked_by_server' => $data->blockedByServer,
-            'blocked_by_middleware' => $data->blockedByMiddleware,
-            'top_ips_count' => $data->topIps->count(),
-            'top_urls_count' => $data->topUrls->count(),
-            'period' => $data->periodLabel,
-        ]);
+        SuspiciousRequest::where('created_at', '<', $cutoff)->delete();
+        BlockedIp::where('created_at', '<', $cutoff)->delete();
     }
 }

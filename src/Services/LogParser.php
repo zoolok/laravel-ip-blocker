@@ -2,6 +2,7 @@
 
 namespace Zoolok\IpBlocker\Services;
 
+use Generator;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Zoolok\IpBlocker\Contracts\LogParserInterface;
@@ -27,6 +28,10 @@ class LogParser implements LogParserInterface
 
     private int $currentPosition = 0;
 
+    /**
+     * @param string $logFormat Log format name ('auto', 'nginx-combined', 'apache-common', 'apache-combined').
+     * @param LoggerInterface $logger PSR-3 logger; used only for error reporting.
+     */
     public function __construct(
         private readonly string $logFormat = 'auto',
         private readonly LoggerInterface $logger = new NullLogger(),
@@ -34,7 +39,21 @@ class LogParser implements LogParserInterface
         $this->strategy = $this->resolveStrategy($logFormat);
     }
 
-    public function parse(string $filePath, bool $fromBeginning = false): \Generator
+    /**
+     * Parse a log file and yield suspicious requests.
+     *
+     * Incrementally reads the file starting from the saved byte position
+     * (or from the beginning when $fromBeginning is true) and yields one
+     * {@see ParsedRequest} per suspicious line. The final byte position is
+     * persisted to a sidecar file for subsequent incremental runs.
+     *
+     * @param string $filePath Absolute path to the log file.
+     * @param bool $fromBeginning If true, ignore the saved position and parse from the start.
+     * @return Generator<int, ParsedRequest>
+     *
+     * @throws \RuntimeException When the log file does not exist, is not readable, or cannot be opened.
+     */
+    public function parse(string $filePath, bool $fromBeginning = false): Generator
     {
         if (! file_exists($filePath) || ! is_readable($filePath)) {
             $this->logger->error('[LogParser.parse] Log file not found or not readable', [
@@ -65,17 +84,7 @@ class LogParser implements LogParserInterface
             fseek($handle, $startPosition);
         }
 
-        $this->logger->info('[LogParser.parse] Starting log parsing', [
-            'path' => $filePath,
-            'format' => $this->detectedFormat,
-            'start_position' => $startPosition,
-        ]);
-
-        $lineNumber = 0;
-        $suspiciousCount = 0;
-
         while (($line = fgets($handle)) !== false) {
-            $lineNumber++;
             $line = trim($line);
 
             if ($line === '') {
@@ -86,21 +95,10 @@ class LogParser implements LogParserInterface
                 $parsed = $this->strategy->parseLine($line);
 
                 if ($parsed !== null) {
-                    $suspiciousCount++;
-                    $this->logger->debug('[LogParser.parse] Found suspicious request', [
-                        'ip' => $parsed->ip,
-                        'url' => $parsed->url,
-                        'method' => $parsed->method,
-                        'status' => $parsed->statusCode,
-                    ]);
-
                     yield $parsed;
                 }
-            } catch (\Throwable $e) {
-                $this->logger->warning('[LogParser.parse] Failed to parse line', [
-                    'line' => $lineNumber,
-                    'error' => $e->getMessage(),
-                ]);
+            } catch (\Throwable) {
+                continue;
             }
         }
 
@@ -108,26 +106,36 @@ class LogParser implements LogParserInterface
         fclose($handle);
 
         $this->savePosition($filePath, $this->currentPosition);
-
-        $this->logger->info('[LogParser.parse] Parsing complete', [
-            'path' => $filePath,
-            'format' => $this->detectedFormat,
-            'lines_processed' => $lineNumber,
-            'suspicious_found' => $suspiciousCount,
-            'end_position' => $this->currentPosition,
-        ]);
     }
 
+    /**
+     * Get the name of the detected or configured log format.
+     *
+     * @return string One of 'auto', 'nginx-combined', 'apache-common', 'apache-combined'.
+     */
     public function getDetectedFormat(): string
     {
         return $this->detectedFormat;
     }
 
+    /**
+     * Get the current byte position in the parsed file.
+     *
+     * @return int Absolute byte offset in the log file.
+     */
     public function getCurrentPosition(): int
     {
         return $this->currentPosition;
     }
 
+    /**
+     * Resolve the parser strategy for a given format name.
+     *
+     * Falls back to the nginx-combined parser when the format is unknown.
+     *
+     * @param string $format Log format name or 'auto'.
+     * @return LogParserStrategy Concrete parser strategy instance.
+     */
     private function resolveStrategy(string $format): LogParserStrategy
     {
         if ($format === 'auto') {
@@ -139,9 +147,6 @@ class LogParser implements LogParserInterface
         $class = self::FORMAT_MAP[$format] ?? null;
 
         if ($class === null) {
-            $this->logger->warning('[LogParser] Unknown log format, falling back to nginx-combined', [
-                'requested_format' => $format,
-            ]);
             $this->detectedFormat = 'nginx-combined';
 
             return new NginxCombinedParser();
@@ -152,12 +157,20 @@ class LogParser implements LogParserInterface
         return new $class();
     }
 
+    /**
+     * Detect the log format by inspecting the first non-empty line.
+     *
+     * Tries every known parser against the first line and keeps the first
+     * one that produces a match. Defaults to nginx-combined otherwise.
+     *
+     * @param resource $handle Open file handle positioned at the start of the file.
+     * @return void
+     */
     private function autoDetectFormat($handle): void
     {
         $firstLine = fgets($handle);
 
         if ($firstLine === false) {
-            $this->logger->warning('[LogParser.autoDetect] Empty log file, defaulting to nginx-combined');
             $this->detectedFormat = 'nginx-combined';
             $this->strategy = new NginxCombinedParser();
 
@@ -179,56 +192,48 @@ class LogParser implements LogParserInterface
                 $this->detectedFormat = $name;
                 $this->strategy = $parser;
 
-                $this->logger->debug('[LogParser.autoDetect] Detected log format', [
-                    'format' => $name,
-                    'sample_ip' => $result->ip,
-                    'sample_url' => $result->url,
-                ]);
-
                 return;
             }
         }
 
-        $this->logger->warning('[LogParser.autoDetect] Could not detect format, defaulting to nginx-combined', [
-            'first_line' => substr($firstLine, 0, 200),
-        ]);
         $this->detectedFormat = 'nginx-combined';
         $this->strategy = new NginxCombinedParser();
     }
 
+    /**
+     * Load the saved byte position for a log file.
+     *
+     * Reads the sidecar position file and returns its value, or 0 when no
+     * position file exists.
+     *
+     * @param string $filePath Absolute path to the log file.
+     * @return int Last parsed byte position, 0 when none was saved.
+     */
     private function loadPosition(string $filePath): int
     {
         $posFile = $filePath.self::POSITION_FILE_SUFFIX;
 
         if (file_exists($posFile)) {
-            $position = (int) file_get_contents($posFile);
-
-            $this->logger->debug('[LogParser] Loaded position', [
-                'path' => $posFile,
-                'position' => $position,
-            ]);
-
-            return $position;
+            return (int) file_get_contents($posFile);
         }
 
         return 0;
     }
 
+    /**
+     * Persist the current byte position for a log file.
+     *
+     * Writes the position into a sidecar file so that the next run can
+     * continue from where the previous one stopped.
+     *
+     * @param string $filePath Absolute path to the log file.
+     * @param int $position Byte position to persist.
+     * @return void
+     */
     private function savePosition(string $filePath, int $position): void
     {
         $posFile = $filePath.self::POSITION_FILE_SUFFIX;
 
-        $written = @file_put_contents($posFile, (string) $position);
-
-        if ($written === false) {
-            $this->logger->warning('[LogParser] Could not save position file', [
-                'path' => $posFile,
-            ]);
-        } else {
-            $this->logger->debug('[LogParser] Saved position', [
-                'path' => $posFile,
-                'position' => $position,
-            ]);
-        }
+        @file_put_contents($posFile, (string) $position);
     }
 }

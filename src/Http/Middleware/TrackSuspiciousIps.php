@@ -12,31 +12,27 @@ use Zoolok\IpBlocker\Models\SuspiciousRequest;
 
 class TrackSuspiciousIps
 {
+    /**
+     * Handle an incoming request.
+     *
+     * Returns a 403 JSON response for already-blocked IPs before the request
+     * is processed. Otherwise passes the request through and records
+     * suspicious responses (status >= 400).
+     *
+     * @param Request $request Incoming HTTP request.
+     * @param Closure(Request): mixed $next Next middleware in the pipeline.
+     * @return mixed The response returned by the next middleware or a 403 JSON response.
+     */
     public function handle(Request $request, Closure $next): mixed
     {
-        $response = $next($request);
-
         $ip = $request->ip();
         $path = $request->path();
 
         if ($ip === null || $this->isExcludedPath($path)) {
-            return $response;
-        }
-
-        $statusCode = $response->getStatusCode();
-
-        if ($statusCode >= 400) {
-            $this->logSuspiciousRequest($request, $statusCode);
+            return $next($request);
         }
 
         if ($this->isIpBlocked($ip)) {
-            Log::info('[TrackSuspiciousIps] BLOCKED', [
-                'ip' => $ip,
-                'url' => $request->fullUrl(),
-                'method' => $request->method(),
-                'status' => $statusCode,
-            ]);
-
             return new JsonResponse(
                 data: [
                     'error' => 'Your IP has been blocked',
@@ -47,9 +43,23 @@ class TrackSuspiciousIps
             );
         }
 
+        $response = $next($request);
+
+        $statusCode = $response->getStatusCode();
+
+        if ($statusCode >= 400) {
+            $this->logSuspiciousRequest($request, $statusCode);
+        }
+
         return $response;
     }
 
+    /**
+     * Check whether the request path is excluded from tracking.
+     *
+     * @param string $path Request path to check.
+     * @return bool True when the path matches an excluded pattern.
+     */
     private function isExcludedPath(string $path): bool
     {
         $excludedPaths = config('ip-blocker.exclude_paths', []);
@@ -63,6 +73,13 @@ class TrackSuspiciousIps
         return false;
     }
 
+    /**
+     * Record a suspicious request into the database.
+     *
+     * @param Request $request Incoming HTTP request.
+     * @param int $statusCode HTTP response status code.
+     * @return void
+     */
     private function logSuspiciousRequest(Request $request, int $statusCode): void
     {
         try {
@@ -74,13 +91,6 @@ class TrackSuspiciousIps
                 'referer' => $request->header('referer'),
                 'status_code' => $statusCode,
             ]);
-
-            Log::debug('[TrackSuspiciousIps] SAVED', [
-                'ip' => $request->ip(),
-                'url' => $request->fullUrl(),
-                'method' => $request->method(),
-                'status' => $statusCode,
-            ]);
         } catch (\Throwable $e) {
             Log::error('[TrackSuspiciousIps] Failed to log suspicious request', [
                 'ip' => $request->ip(),
@@ -90,6 +100,12 @@ class TrackSuspiciousIps
         }
     }
 
+    /**
+     * Check whether the IP address is actively blocked.
+     *
+     * @param string $ip IP address to check.
+     * @return bool True when the IP has an active block record.
+     */
     private function isIpBlocked(string $ip): bool
     {
         return BlockedIp::active()->where('ip', $ip)->exists();
