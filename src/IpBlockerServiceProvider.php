@@ -110,26 +110,61 @@ class IpBlockerServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the daily report scheduler.
+     * Register the package scheduled tasks.
      *
-     * Uses the schedule resolver so the task works in Laravel 10+.
+     * Registers the daily report and, when enabled, the automatic
+     * `ip:parse-log --block` task. Uses the schedule resolver so the tasks
+     * work in Laravel 10+.
      *
      * @return void
      */
     private function registerScheduler(): void
     {
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
-            $reportEnabled = $this->app['config']->get('ip-blocker.report.enabled', true);
-            $reportEmail = $this->app['config']->get('ip-blocker.report.email');
-            $scheduleExpression = $this->app['config']->get('ip-blocker.report.schedule', '0 9 * * *');
-
-            if ($reportEnabled && $reportEmail) {
-                $schedule->call(function () {
-                    $reportService = $this->app->make(ReportService::class);
-                    $reportService->sendDailyReport();
-                })->cron($scheduleExpression)->name('ip-blocker:daily-report');
-            }
+            $this->registerDailyReport($schedule);
+            $this->registerLogParsing($schedule);
         });
+    }
+
+    /**
+     * Register the daily report scheduled task.
+     *
+     * @param Schedule $schedule Scheduler instance.
+     * @return void
+     */
+    private function registerDailyReport(Schedule $schedule): void
+    {
+        $reportEnabled = $this->app['config']->get('ip-blocker.report.enabled', true);
+        $reportEmail = $this->app['config']->get('ip-blocker.report.email');
+        $scheduleExpression = $this->app['config']->get('ip-blocker.report.schedule', '0 9 * * *');
+
+        if ($reportEnabled && $reportEmail) {
+            $schedule->call(function () {
+                $reportService = $this->app->make(ReportService::class);
+                $reportService->sendDailyReport();
+            })->cron($scheduleExpression)->name('ip-blocker:daily-report');
+        }
+    }
+
+    /**
+     * Register the automatic log parsing scheduled task.
+     *
+     * @param Schedule $schedule Scheduler instance.
+     * @return void
+     */
+    private function registerLogParsing(Schedule $schedule): void
+    {
+        $schedulerEnabled = $this->app['config']->get('ip-blocker.scheduler.enabled', false);
+        $scheduleExpression = $this->app['config']->get('ip-blocker.scheduler.schedule', '*/5 * * * *');
+
+        if (! $schedulerEnabled) {
+            return;
+        }
+
+        $schedule->command('ip:parse-log --block')
+            ->cron($scheduleExpression)
+            ->name('ip-blocker:parse-log')
+            ->withoutOverlapping();
     }
 
     /**

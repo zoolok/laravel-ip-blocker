@@ -20,6 +20,7 @@ class IpBlockerServiceProviderTest extends TestCase
     {
         $app['config']->set('ip-blocker.report.enabled', true);
         $app['config']->set('ip-blocker.report.email', 'admin@example.com');
+        $app['config']->set('ip-blocker.scheduler.enabled', true);
     }
 
     /**
@@ -55,6 +56,47 @@ class IpBlockerServiceProviderTest extends TestCase
         $matches = array_values(array_filter(
             $schedule->events(),
             fn ($event) => $event->description === 'ip-blocker:daily-report',
+        ));
+
+        $this->assertCount(0, $matches);
+    }
+
+    /**
+     * php artisan test --filter=test_registers_log_parsing_schedule
+     *
+     * Проверяет, что задача автоматического парсинга логов зарегистрирована в планировщике
+     */
+    public function test_registers_log_parsing_schedule(): void
+    {
+        $schedule = $this->app->make(Schedule::class);
+
+        $matches = array_values(array_filter(
+            $schedule->events(),
+            fn ($event) => $event->description === 'ip-blocker:parse-log',
+        ));
+
+        $this->assertCount(1, $matches);
+
+        $command = $matches[0]->command ?? '';
+
+        $this->assertStringContainsString('ip:parse-log', $command);
+        $this->assertStringContainsString('--block', $command);
+    }
+
+    /**
+     * php artisan test --filter=test_does_not_register_log_parsing_schedule_when_disabled
+     *
+     * Проверяет, что задача парсинга не регистрируется, когда планировщик отключён
+     */
+    public function test_does_not_register_log_parsing_schedule_when_disabled(): void
+    {
+        config(['ip-blocker.scheduler.enabled' => false]);
+
+        $schedule = $this->app->make(Schedule::class);
+
+        $matches = array_values(array_filter(
+            $schedule->events(),
+            fn ($event) => $event->description === 'ip-blocker:parse-log',
         ));
 
         $this->assertCount(0, $matches);

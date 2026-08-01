@@ -182,6 +182,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Automatic Log Parsing Scheduler
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the package registers a scheduled task that runs
+    | `ip:parse-log --block` on the given cron expression. This parses new
+    | lines from the access log (position is tracked automatically) and blocks
+    | offending IPs without any manual cron setup.
+    |
+    | Requires Laravel's scheduler (`php artisan schedule:run`) to be running,
+    | e.g. via `* * * * * php /path/to/artisan schedule:run`.
+    |
+    */
+    'scheduler' => [
+        'enabled' => env('IP_BLOCKER_SCHEDULER_ENABLED', false),
+        'schedule' => env('IP_BLOCKER_SCHEDULER_SCHEDULE', '*/5 * * * *'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Cleanup Settings
     |--------------------------------------------------------------------------
     |
