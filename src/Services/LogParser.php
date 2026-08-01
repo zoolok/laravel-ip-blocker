@@ -31,10 +31,12 @@ class LogParser implements LogParserInterface
     /**
      * @param string $logFormat Log format name ('auto', 'nginx-combined', 'apache-common', 'apache-combined').
      * @param LoggerInterface $logger PSR-3 logger; used only for error reporting.
+     * @param SuspiciousDetector|null $detector Detector for UA/path-based suspicion.
      */
     public function __construct(
         private readonly string $logFormat = 'auto',
         private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly ?SuspiciousDetector $detector = null,
     ) {
         $this->strategy = $this->resolveStrategy($logFormat);
     }
@@ -119,6 +121,16 @@ class LogParser implements LogParserInterface
     }
 
     /**
+     * Get the configured suspicious-request detector.
+     *
+     * @return SuspiciousDetector Detector used for UA/path-based suspicion.
+     */
+    public function getDetector(): SuspiciousDetector
+    {
+        return $this->detector ?? new SuspiciousDetector();
+    }
+
+    /**
      * Get the current byte position in the parsed file.
      *
      * @return int Absolute byte offset in the log file.
@@ -141,7 +153,7 @@ class LogParser implements LogParserInterface
         if ($format === 'auto') {
             $this->detectedFormat = 'auto';
 
-            return new NginxCombinedParser();
+            return new NginxCombinedParser($this->detector);
         }
 
         $class = self::FORMAT_MAP[$format] ?? null;
@@ -149,12 +161,12 @@ class LogParser implements LogParserInterface
         if ($class === null) {
             $this->detectedFormat = 'nginx-combined';
 
-            return new NginxCombinedParser();
+            return new NginxCombinedParser($this->detector);
         }
 
         $this->detectedFormat = $format;
 
-        return new $class();
+        return new $class($this->detector);
     }
 
     /**
@@ -172,7 +184,7 @@ class LogParser implements LogParserInterface
 
         if ($firstLine === false) {
             $this->detectedFormat = 'nginx-combined';
-            $this->strategy = new NginxCombinedParser();
+            $this->strategy = new NginxCombinedParser($this->detector);
 
             return;
         }
@@ -180,9 +192,9 @@ class LogParser implements LogParserInterface
         $firstLine = trim($firstLine);
 
         $parsers = [
-            'nginx-combined' => new NginxCombinedParser(),
-            'apache-combined' => new ApacheCombinedParser(),
-            'apache-common' => new ApacheCommonParser(),
+            'nginx-combined' => new NginxCombinedParser($this->detector),
+            'apache-combined' => new ApacheCombinedParser($this->detector),
+            'apache-common' => new ApacheCommonParser($this->detector),
         ];
 
         foreach ($parsers as $name => $parser) {

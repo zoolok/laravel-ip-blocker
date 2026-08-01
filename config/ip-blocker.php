@@ -56,6 +56,77 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Suspicious Request Detection
+    |--------------------------------------------------------------------------
+    |
+    | Besides HTTP status codes >= 400, requests are also considered
+    | suspicious when their User-Agent or URL path matches one of these
+    | patterns. This catches scanners that get 200 responses (e.g. SPA
+    | apps returning index.html for unknown paths).
+    |
+    | User-Agent patterns are case-insensitive substring matches.
+    | Path patterns support Str::is() wildcards (e.g. '/owa*').
+    |
+    */
+    'suspicious' => [
+        'user_agents' => [
+            '*exchangescanner*',
+            '*zgrab*',
+            '*internetmeasurement*',
+            '*backupland*',
+            '*visionheight*',
+            '*sqlmap*',
+            '*nikto*',
+            '*nessus*',
+            '*nuclei*',
+            '*masscan*',
+            '*wpscan*',
+            '*acunetix*',
+            '*dirbuster*',
+            '*gobuster*',
+            '*ffuf*',
+            '*mglndd*',
+            '*mirai*',
+            '*openvas*',
+        ],
+        'paths' => [
+            '/owa*',
+            '/ews*',
+            '/autodiscover*',
+            '/microsoft-server-activesync*',
+            '/ecp*',
+            '/mapi*',
+            '/rpc*',
+            '/goform*',
+            '/cgi-bin*',
+            '/isapi*',
+            '/sdk*',
+            '/reports*',
+            '/reportserver*',
+            '/developmentserver*',
+            '/owa/auth*',
+            '/wp-admin*',
+            '/wp-login*',
+            '/wp-content*',
+            '/phpmyadmin*',
+            '/pma*',
+            '/.env',
+            '/config.php',
+            '/shell.php',
+            '/c99.php',
+            '/.git*',
+            '/actuator*',
+            '/console*',
+            '/solr*',
+            '/jolokia*',
+            '/shell*',
+            '/xmpp*',
+            '/vendor*',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Block Duration (minutes)
     |--------------------------------------------------------------------------
     |

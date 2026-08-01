@@ -4,6 +4,7 @@ namespace Zoolok\IpBlocker\Tests\Parsers;
 
 use PHPUnit\Framework\TestCase;
 use Zoolok\IpBlocker\Parsers\NginxCombinedParser;
+use Zoolok\IpBlocker\Services\SuspiciousDetector;
 
 class NginxCombinedParserTest extends TestCase
 {
@@ -102,5 +103,43 @@ class NginxCombinedParserTest extends TestCase
 
         $this->assertNotNull($result);
         $this->assertSame('/admin', $result->url);
+    }
+
+    public function test_parses_200_response_with_suspicious_user_agent(): void
+    {
+        $detector = new SuspiciousDetector(suspiciousUserAgents: ['*exchangescanner*']);
+        $parser = new NginxCombinedParser($detector);
+
+        $line = '179.43.186.241 - - [01/Aug/2026:02:19:02 +0300] "GET /owa/ HTTP/1.1" 200 613 "-" "Mozilla/5.0 (compatible; ExchangeScanner/2.1)"';
+
+        $result = $parser->parseLine($line);
+
+        $this->assertNotNull($result);
+        $this->assertSame('179.43.186.241', $result->ip);
+        $this->assertSame(200, $result->statusCode);
+    }
+
+    public function test_parses_200_response_with_suspicious_path(): void
+    {
+        $detector = new SuspiciousDetector(suspiciousPaths: ['/owa*']);
+        $parser = new NginxCombinedParser($detector);
+
+        $line = '179.43.186.241 - - [01/Aug/2026:02:19:02 +0300] "GET /owa/ HTTP/1.1" 200 613 "-" "Mozilla/5.0"';
+
+        $result = $parser->parseLine($line);
+
+        $this->assertNotNull($result);
+        $this->assertSame(200, $result->statusCode);
+        $this->assertSame('/owa/', $result->url);
+    }
+
+    public function test_skips_200_response_without_suspicious_signals(): void
+    {
+        $detector = new SuspiciousDetector(suspiciousUserAgents: ['*exchangescanner*'], suspiciousPaths: ['/owa*']);
+        $parser = new NginxCombinedParser($detector);
+
+        $line = '10.0.0.1 - - [10/Jul/2026:13:55:36 +0000] "GET /index HTTP/1.1" 200 123 "-" "Mozilla/5.0"';
+
+        $this->assertNull($parser->parseLine($line));
     }
 }

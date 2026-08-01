@@ -54,7 +54,10 @@ class ParseLogCommand extends Command
 
         $this->components->info("Parsing log file: {$filePath}");
 
-        $parser = new LogParser(logFormat: $format);
+        $parser = new LogParser(
+            logFormat: $format,
+            detector: $logParser->getDetector(),
+        );
 
         $bar = $this->output->createProgressBar();
         $bar->setFormat(' %current% suspicious requests found [%bar%] %elapsed:6s%');

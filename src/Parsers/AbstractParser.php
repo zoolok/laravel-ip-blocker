@@ -4,10 +4,21 @@ namespace Zoolok\IpBlocker\Parsers;
 
 use Zoolok\IpBlocker\Contracts\LogParserStrategy;
 use Zoolok\IpBlocker\Contracts\ParsedRequest;
+use Zoolok\IpBlocker\Services\SuspiciousDetector;
 
 abstract class AbstractParser implements LogParserStrategy
 {
     protected const MIN_SUSPICIOUS_STATUS = 400;
+
+    protected SuspiciousDetector $detector;
+
+    /**
+     * @param SuspiciousDetector|null $detector Detector for UA/path-based detection.
+     */
+    public function __construct(?SuspiciousDetector $detector = null)
+    {
+        $this->detector = $detector ?? new SuspiciousDetector();
+    }
 
     /**
      * Normalize a URL by removing query string and fragment.
@@ -87,10 +98,6 @@ abstract class AbstractParser implements LogParserStrategy
             return null;
         }
 
-        if (! $this->isSuspiciousStatus($statusCode)) {
-            return null;
-        }
-
         $url = $this->normalizeUrl($matches['url'] ?? '/');
         $method = strtoupper($matches['method'] ?? 'GET');
         $timestamp = $this->parseTimestamp($matches['date'] ?? null);
@@ -103,6 +110,10 @@ abstract class AbstractParser implements LogParserStrategy
 
         if ($referer === '-' || $referer === '') {
             $referer = null;
+        }
+
+        if (! $this->detector->isSuspicious($url, $userAgent, $statusCode)) {
+            return null;
         }
 
         return new ParsedRequest(

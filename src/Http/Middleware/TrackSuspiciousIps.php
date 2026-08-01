@@ -9,15 +9,23 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Zoolok\IpBlocker\Models\BlockedIp;
 use Zoolok\IpBlocker\Models\SuspiciousRequest;
+use Zoolok\IpBlocker\Services\SuspiciousDetector;
 
 class TrackSuspiciousIps
 {
+    /**
+     * @param SuspiciousDetector $detector Detector for status/UA/path-based suspicion.
+     */
+    public function __construct(
+        private readonly SuspiciousDetector $detector = new SuspiciousDetector(),
+    ) {}
+
     /**
      * Handle an incoming request.
      *
      * Returns a 403 JSON response for already-blocked IPs before the request
      * is processed. Otherwise passes the request through and records
-     * suspicious responses (status >= 400).
+     * suspicious responses (status >= 400, suspicious UA, or suspicious path).
      *
      * @param Request $request Incoming HTTP request.
      * @param Closure(Request): mixed $next Next middleware in the pipeline.
@@ -47,7 +55,7 @@ class TrackSuspiciousIps
 
         $statusCode = $response->getStatusCode();
 
-        if ($statusCode >= 400) {
+        if ($this->detector->isSuspicious('/'.$path, $request->userAgent(), $statusCode)) {
             $this->logSuspiciousRequest($request, $statusCode);
         }
 
@@ -65,7 +73,7 @@ class TrackSuspiciousIps
         $excludedPaths = config('ip-blocker.exclude_paths', []);
 
         foreach ($excludedPaths as $excluded) {
-            if (Str::is($excluded, $path)) {
+            if (Str::is('/'.trim($excluded, '/'), '/'.trim($path, '/'))) {
                 return true;
             }
         }

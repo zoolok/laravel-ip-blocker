@@ -14,6 +14,7 @@ use Zoolok\IpBlocker\Services\LogParser;
 use Zoolok\IpBlocker\Services\IpAnalyzer;
 use Zoolok\IpBlocker\Services\DenyGenerator;
 use Zoolok\IpBlocker\Services\ReportService;
+use Zoolok\IpBlocker\Services\SuspiciousDetector;
 
 class IpBlockerServiceProvider extends ServiceProvider
 {
@@ -61,9 +62,15 @@ class IpBlockerServiceProvider extends ServiceProvider
      */
     private function registerServices(): void
     {
+        $this->app->singleton(SuspiciousDetector::class, fn ($app) => new SuspiciousDetector(
+            suspiciousUserAgents: $app['config']->get('ip-blocker.suspicious.user_agents', []),
+            suspiciousPaths: $app['config']->get('ip-blocker.suspicious.paths', []),
+        ));
+
         $this->app->singleton(LogParser::class, fn ($app) => new LogParser(
             logFormat: $app['config']->get('ip-blocker.log_format', 'auto'),
             logger: $app->make(LoggerInterface::class),
+            detector: $app->make(SuspiciousDetector::class),
         ));
 
         $this->app->singleton(IpAnalyzer::class, fn ($app) => new IpAnalyzer(
