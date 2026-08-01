@@ -13,9 +13,10 @@ class ParseLogCommand extends Command
         {--path= : Path to the access log file (overrides config)}
         {--format=auto : Log format: auto, nginx-combined, apache-common, apache-combined}
         {--dry-run : Parse but do not save to database}
-        {--from-beginning : Ignore saved position and parse from the start of the file}';
+        {--from-beginning : Ignore saved position and parse from the start of the file}
+        {--block : Automatically run ip:block after parsing}';
 
-    protected $description = 'Parse web server access log and detect suspicious requests';
+    protected $description = 'Parse web server access log, detect suspicious requests and optionally block them';
 
     private int $foundCount = 0;
 
@@ -27,8 +28,9 @@ class ParseLogCommand extends Command
      * Execute the console command.
      *
      * Parses the access log, shows a progress bar, saves detected suspicious
-     * requests to the database in batches of 100 (unless --dry-run), and
-     * prints a summary.
+     * requests to the database in batches of 100 (unless --dry-run), prints a
+     * summary, and (with --block) runs ip:block to analyze and block the
+     * offending IPs.
      *
      * @param LogParser $logParser Log parser service.
      * @return int Command exit code (SUCCESS or FAILURE).
@@ -39,6 +41,7 @@ class ParseLogCommand extends Command
         $format = $this->option('format') ?? 'auto';
         $dryRun = (bool) $this->option('dry-run');
         $fromBeginning = (bool) $this->option('from-beginning');
+        $block = (bool) $this->option('block');
 
         if ($filePath === null) {
             $this->error('No log file path specified. Set IP_BLOCKER_LOG_PATH env or use --path option.');
@@ -109,6 +112,12 @@ class ParseLogCommand extends Command
                 }
             } else {
                 $this->components->twoColumnDetail('Dry run', 'No records saved');
+            }
+
+            if ($block && ! $dryRun) {
+                $this->newLine();
+                $this->components->info('Running ip:block to analyze and block suspicious IPs...');
+                $this->call('ip:block', ['--force' => true]);
             }
         } catch (\Throwable $e) {
             $bar->finish();

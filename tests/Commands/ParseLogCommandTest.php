@@ -5,6 +5,8 @@ namespace Zoolok\IpBlocker\Tests\Commands;
 use Illuminate\Support\Facades\Artisan;
 use Orchestra\Testbench\TestCase;
 use Zoolok\IpBlocker\IpBlockerServiceProvider;
+use Zoolok\IpBlocker\Models\BlockedIp;
+use Zoolok\IpBlocker\Models\SuspiciousRequest;
 
 class ParseLogCommandTest extends TestCase
 {
@@ -23,6 +25,9 @@ class ParseLogCommandTest extends TestCase
             'database' => ':memory:',
             'prefix' => '',
         ]);
+
+        $app['config']->set('ip-blocker.thresholds.max_404_per_window', 1);
+        $app['config']->set('ip-blocker.analysis_window_minutes', 60);
     }
 
     protected function setUp(): void
@@ -79,6 +84,39 @@ class ParseLogCommandTest extends TestCase
 
         $this->assertEquals(0, $exitCode);
         $this->assertStringContainsString('Dry run', Artisan::output());
+    }
+
+    public function test_block_flag_runs_ip_block_and_blocks_ip(): void
+    {
+        $logFile = $this->tempDir.'/access.log';
+        file_put_contents($logFile, "192.168.1.1 - - [10/Jul/2026:13:55:36 +0000] \"GET /admin HTTP/1.1\" 404 123 \"-\" \"curl/7.68.0\"\n");
+
+        $exitCode = Artisan::call('ip:parse-log', [
+            '--path' => $logFile,
+            '--from-beginning' => true,
+            '--block' => true,
+        ]);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertStringContainsString('Running ip:block', Artisan::output());
+
+        $this->assertDatabaseHas('blocked_ips', ['ip' => '192.168.1.1']);
+    }
+
+    public function test_block_flag_with_dry_run_does_not_block(): void
+    {
+        $logFile = $this->tempDir.'/access.log';
+        file_put_contents($logFile, "192.168.1.1 - - [10/Jul/2026:13:55:36 +0000] \"GET /admin HTTP/1.1\" 404 123 \"-\" \"curl/7.68.0\"\n");
+
+        $exitCode = Artisan::call('ip:parse-log', [
+            '--path' => $logFile,
+            '--from-beginning' => true,
+            '--dry-run' => true,
+            '--block' => true,
+        ]);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertDatabaseMissing('blocked_ips', ['ip' => '192.168.1.1']);
     }
 
     private function removeDirectory(string $dir): void
