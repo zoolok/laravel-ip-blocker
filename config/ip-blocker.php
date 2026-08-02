@@ -241,6 +241,7 @@ return [
         '/admin*',
         '/vendor/moonshine*',
         '/storage*',
+        '/lk*',
     ],
 
     /*

@@ -93,12 +93,14 @@ class SuspiciousDetectorTest extends TestCase
     public function test_is_excluded_matches_wildcard_patterns(): void
     {
         $detector = new SuspiciousDetector(
-            excludedPaths: ['/admin*', '/vendor/moonshine*'],
+            excludedPaths: ['/admin*', '/vendor/moonshine*', '/lk*'],
         );
 
         $this->assertTrue($detector->isExcluded('/admin'));
         $this->assertTrue($detector->isExcluded('/admin/resource/page'));
         $this->assertTrue($detector->isExcluded('/vendor/moonshine/assets/app.js'));
+        $this->assertTrue($detector->isExcluded('/lk/login'));
+        $this->assertTrue($detector->isExcluded('/lk/settings/dictionaries/positions'));
         $this->assertFalse($detector->isExcluded('/owa/'));
         $this->assertFalse($detector->isExcluded('/'));
     }
