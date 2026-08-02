@@ -8,6 +8,7 @@ use Psr\Log\LoggerInterface;
 use Zoolok\IpBlocker\Commands\BlockCommand;
 use Zoolok\IpBlocker\Commands\InstallMoonShineCommand;
 use Zoolok\IpBlocker\Commands\ParseLogCommand;
+use Zoolok\IpBlocker\Commands\UnblockCommand;
 use Zoolok\IpBlocker\Http\Middleware\TrackSuspiciousIps;
 use Zoolok\IpBlocker\MoonShine\BlockedIpResource;
 use Zoolok\IpBlocker\Services\LogParser;
@@ -109,6 +110,7 @@ class IpBlockerServiceProvider extends ServiceProvider
         $this->commands([
             ParseLogCommand::class,
             BlockCommand::class,
+            UnblockCommand::class,
             InstallMoonShineCommand::class,
         ]);
     }
