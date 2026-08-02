@@ -6,7 +6,6 @@ use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Zoolok\IpBlocker\Models\BlockedIp;
 use Zoolok\IpBlocker\Models\SuspiciousRequest;
 use Zoolok\IpBlocker\Services\SuspiciousDetector;
@@ -36,7 +35,7 @@ class TrackSuspiciousIps
         $ip = $request->ip();
         $path = $request->path();
 
-        if ($ip === null || $this->isExcludedPath($path)) {
+        if ($ip === null || $this->detector->isExcluded('/'.$path)) {
             return $next($request);
         }
 
@@ -60,25 +59,6 @@ class TrackSuspiciousIps
         }
 
         return $response;
-    }
-
-    /**
-     * Check whether the request path is excluded from tracking.
-     *
-     * @param string $path Request path to check.
-     * @return bool True when the path matches an excluded pattern.
-     */
-    private function isExcludedPath(string $path): bool
-    {
-        $excludedPaths = config('ip-blocker.exclude_paths', []);
-
-        foreach ($excludedPaths as $excluded) {
-            if (Str::is('/'.trim($excluded, '/'), '/'.trim($path, '/'))) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

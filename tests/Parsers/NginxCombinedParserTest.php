@@ -142,4 +142,24 @@ class NginxCombinedParserTest extends TestCase
 
         $this->assertNull($parser->parseLine($line));
     }
+
+    public function test_skips_excluded_path_even_with_bad_status(): void
+    {
+        $detector = new SuspiciousDetector(suspiciousPaths: ['/vendor*'], excludedPaths: ['/vendor/moonshine*']);
+        $parser = new NginxCombinedParser($detector);
+
+        $line = '89.207.69.111 - - [02/Aug/2026:08:43:49 +0300] "GET /vendor/moonshine/assets/app.js HTTP/1.1" 200 14628 "-" "Mozilla/5.0"';
+
+        $this->assertNull($parser->parseLine($line));
+    }
+
+    public function test_excluded_admin_path_not_tracked_even_with_503(): void
+    {
+        $detector = new SuspiciousDetector(excludedPaths: ['/admin*']);
+        $parser = new NginxCombinedParser($detector);
+
+        $line = '89.207.69.111 - - [02/Aug/2026:08:43:28 +0300] "GET /admin/resource/blocked-ip-resource/blocked-ip-index-page HTTP/1.1" 503 6692 "-" "Mozilla/5.0"';
+
+        $this->assertNull($parser->parseLine($line));
+    }
 }

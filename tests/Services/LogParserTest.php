@@ -4,6 +4,7 @@ namespace Zoolok\IpBlocker\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
 use Zoolok\IpBlocker\Services\LogParser;
+use Zoolok\IpBlocker\Services\SuspiciousDetector;
 
 class LogParserTest extends TestCase
 {
@@ -113,6 +114,27 @@ class LogParserTest extends TestCase
         $results = iterator_to_array($parser->parse($logFile, fromBeginning: true));
 
         $this->assertCount(0, $results);
+    }
+
+    public function test_excludes_admin_paths_from_log_parsing(): void
+    {
+        $detector = new SuspiciousDetector(
+            suspiciousPaths: ['/vendor*', '/owa*'],
+            excludedPaths: ['/admin*', '/vendor/moonshine*'],
+        );
+        $logFile = $this->createLogFile([
+            '89.207.69.111 - - [02/Aug/2026:08:43:28 +0300] "GET /admin/resource/blocked-ip-resource/blocked-ip-index-page HTTP/1.1" 503 6692 "-" "Mozilla/5.0"',
+            '89.207.69.111 - - [02/Aug/2026:08:43:49 +0300] "GET /vendor/moonshine/assets/app.js HTTP/1.1" 200 14628 "-" "Mozilla/5.0"',
+            '10.0.0.1 - - [02/Aug/2026:08:43:50 +0300] "GET /owa/ HTTP/1.1" 200 613 "-" "Mozilla/5.0"',
+        ]);
+
+        $parser = new LogParser('nginx-combined', detector: $detector);
+
+        $results = iterator_to_array($parser->parse($logFile, fromBeginning: true));
+
+        $this->assertCount(1, $results);
+        $this->assertSame('10.0.0.1', $results[0]->ip);
+        $this->assertSame('/owa/', $results[0]->url);
     }
 
     private function createLogFile(array $lines): string

@@ -17,14 +17,19 @@ class SuspiciousDetector
     /**
      * @param array<int, string> $suspiciousUserAgents Case-insensitive Str::is() patterns.
      * @param array<int, string> $suspiciousPaths Str::is() patterns.
+     * @param array<int, string> $excludedPaths Str::is() patterns that never match as suspicious.
      */
     public function __construct(
         private readonly array $suspiciousUserAgents = [],
         private readonly array $suspiciousPaths = [],
+        private readonly array $excludedPaths = [],
     ) {}
 
     /**
      * Check whether a request is suspicious.
+     *
+     * A request on an excluded path is never considered suspicious, even
+     * when it has a bad status code or matches a suspicious UA/path pattern.
      *
      * @param string $url URL path (with leading slash).
      * @param string|null $userAgent User-Agent header, or null.
@@ -33,6 +38,10 @@ class SuspiciousDetector
      */
     public function isSuspicious(string $url, ?string $userAgent, int $statusCode): bool
     {
+        if ($this->isExcluded($url)) {
+            return false;
+        }
+
         if ($statusCode >= 400) {
             return true;
         }
@@ -95,5 +104,26 @@ class SuspiciousDetector
         }
 
         return null;
+    }
+
+    /**
+     * Check whether a URL path matches an excluded pattern.
+     *
+     * @param string $url URL path (with leading slash).
+     * @return bool True when the path matches an excluded pattern.
+     */
+    public function isExcluded(string $url): bool
+    {
+        foreach ($this->excludedPaths as $pattern) {
+            if ($pattern === '' || $pattern === '*') {
+                continue;
+            }
+
+            if (Str::is(mb_strtolower($pattern), mb_strtolower($url))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

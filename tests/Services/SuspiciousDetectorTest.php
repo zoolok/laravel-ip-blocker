@@ -67,4 +67,39 @@ class SuspiciousDetectorTest extends TestCase
         $this->assertSame('/owa*', $detector->findMatchingPath('/owa/'));
         $this->assertNull($detector->findMatchingPath('/home'));
     }
+
+    public function test_excluded_path_is_never_suspicious_even_with_bad_status(): void
+    {
+        $detector = new SuspiciousDetector(
+            suspiciousPaths: ['/owa*'],
+            excludedPaths: ['/admin*', '/vendor/moonshine*'],
+        );
+
+        $this->assertFalse($detector->isSuspicious('/admin', 'Mozilla/5.0', 404));
+        $this->assertFalse($detector->isSuspicious('/admin/resource/page', 'Mozilla/5.0', 500));
+        $this->assertFalse($detector->isSuspicious('/vendor/moonshine/assets/app.js', 'Mozilla/5.0', 200));
+    }
+
+    public function test_excluded_path_is_never_suspicious_even_with_suspicious_ua(): void
+    {
+        $detector = new SuspiciousDetector(
+            suspiciousUserAgents: ['*exchangescanner*'],
+            excludedPaths: ['/admin*'],
+        );
+
+        $this->assertFalse($detector->isSuspicious('/admin/login', 'Mozilla/5.0 (compatible; ExchangeScanner/2.1)', 200));
+    }
+
+    public function test_is_excluded_matches_wildcard_patterns(): void
+    {
+        $detector = new SuspiciousDetector(
+            excludedPaths: ['/admin*', '/vendor/moonshine*'],
+        );
+
+        $this->assertTrue($detector->isExcluded('/admin'));
+        $this->assertTrue($detector->isExcluded('/admin/resource/page'));
+        $this->assertTrue($detector->isExcluded('/vendor/moonshine/assets/app.js'));
+        $this->assertFalse($detector->isExcluded('/owa/'));
+        $this->assertFalse($detector->isExcluded('/'));
+    }
 }

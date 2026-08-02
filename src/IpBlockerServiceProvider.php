@@ -65,6 +65,7 @@ class IpBlockerServiceProvider extends ServiceProvider
         $this->app->singleton(SuspiciousDetector::class, fn ($app) => new SuspiciousDetector(
             suspiciousUserAgents: $app['config']->get('ip-blocker.suspicious.user_agents', []),
             suspiciousPaths: $app['config']->get('ip-blocker.suspicious.paths', []),
+            excludedPaths: $app['config']->get('ip-blocker.exclude_paths', []),
         ));
 
         $this->app->singleton(LogParser::class, fn ($app) => new LogParser(

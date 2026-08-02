@@ -238,6 +238,9 @@ return [
         '/api/documentation',
         '/favicon.ico',
         '/robots.txt',
+        '/admin*',
+        '/vendor/moonshine*',
+        '/storage*',
     ],
 
     /*
