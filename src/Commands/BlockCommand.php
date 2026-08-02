@@ -253,14 +253,16 @@ class BlockCommand extends Command
 
         $expiresAt = $duration > 0 ? now()->addMinutes($duration) : null;
 
-        BlockedIp::query()->create([
-            'ip' => $ip,
-            'reason' => $reason,
-            'blocked_by' => $blockedBy,
-            'blocked_at' => now(),
-            'expires_at' => $expiresAt,
-            'is_active' => true,
-        ]);
+        BlockedIp::query()->updateOrCreate(
+            ['ip' => $ip],
+            [
+                'reason' => $reason,
+                'blocked_by' => $blockedBy,
+                'blocked_at' => now(),
+                'expires_at' => $expiresAt,
+                'is_active' => true,
+            ],
+        );
 
         $durationLabel = $duration > 0 ? "{$duration} min" : 'permanent';
 

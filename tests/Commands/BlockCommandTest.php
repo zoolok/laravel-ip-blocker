@@ -69,4 +69,62 @@ class BlockCommandTest extends TestCase
         $this->assertNotNull($blocked);
         $this->assertSame('Manual block test', $blocked->reason);
     }
+
+    public function test_blocking_existing_ip_does_not_fail(): void
+    {
+        BlockedIp::query()->create([
+            'ip' => '10.0.0.1',
+            'reason' => 'Initial block',
+            'blocked_by' => 'auto',
+            'blocked_at' => now()->subHour(),
+            'expires_at' => now()->subMinute(),
+            'is_active' => false,
+        ]);
+
+        $exitCode = Artisan::call('ip:block', [
+            '--ip' => '10.0.0.1',
+            '--reason' => 'Re-blocked',
+            '--force' => true,
+        ]);
+
+        $this->assertEquals(0, $exitCode);
+
+        $blocked = BlockedIp::where('ip', '10.0.0.1')->first();
+
+        $this->assertNotNull($blocked);
+        $this->assertSame('Re-blocked', $blocked->reason);
+        $this->assertTrue((bool) $blocked->is_active);
+    }
+
+    public function test_reblock_after_analysis_for_expired_ip(): void
+    {
+        BlockedIp::query()->create([
+            'ip' => '10.0.0.2',
+            'reason' => 'Old expired block',
+            'blocked_by' => 'auto',
+            'blocked_at' => now()->subHour(),
+            'expires_at' => now()->subMinute(),
+            'is_active' => false,
+        ]);
+
+        SuspiciousRequest::query()->create([
+            'ip' => '10.0.0.2',
+            'url' => '/owa/',
+            'method' => 'GET',
+            'status_code' => 404,
+        ]);
+
+        $exitCode = Artisan::call('ip:block', [
+            '--force' => true,
+            '--no-nginx' => true,
+        ]);
+
+        $this->assertEquals(0, $exitCode);
+
+        $blocked = BlockedIp::where('ip', '10.0.0.2')->first();
+
+        $this->assertNotNull($blocked);
+        $this->assertTrue((bool) $blocked->is_active);
+        $this->assertEquals(1, BlockedIp::count());
+    }
 }
