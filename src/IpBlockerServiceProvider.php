@@ -79,6 +79,9 @@ class IpBlockerServiceProvider extends ServiceProvider
             maxRequests: (int) $app['config']->get('ip-blocker.thresholds.max_requests_per_window', 100),
             maxUniqueUrls: (int) $app['config']->get('ip-blocker.thresholds.max_unique_urls_per_window', 20),
             blockDuration: (int) $app['config']->get('ip-blocker.block_duration_minutes', 60),
+            detector: $app->make(SuspiciousDetector::class),
+            blockOnUserAgent: (bool) $app['config']->get('ip-blocker.suspicious.block_on_user_agent', true),
+            blockOnPath: (bool) $app['config']->get('ip-blocker.suspicious.block_on_path', false),
         ));
 
         $this->app->singleton(DenyGenerator::class, fn ($app) => new DenyGenerator(

@@ -45,4 +45,26 @@ class SuspiciousDetectorTest extends TestCase
         $this->assertFalse($detector->isSuspicious('/owa/', null, 200));
         $this->assertTrue($detector->isSuspicious('/owa/', null, 404));
     }
+
+    public function test_find_matching_user_agent_returns_pattern(): void
+    {
+        $detector = new SuspiciousDetector(
+            suspiciousUserAgents: ['*exchangescanner*', '*zgrab*'],
+        );
+
+        $this->assertSame('*exchangescanner*', $detector->findMatchingUserAgent('Mozilla/5.0 (compatible; ExchangeScanner/2.1)'));
+        $this->assertNull($detector->findMatchingUserAgent('Mozilla/5.0 (Windows NT 10.0)'));
+        $this->assertNull($detector->findMatchingUserAgent(null));
+        $this->assertNull($detector->findMatchingUserAgent(''));
+    }
+
+    public function test_find_matching_path_returns_pattern(): void
+    {
+        $detector = new SuspiciousDetector(
+            suspiciousPaths: ['/owa*', '/cgi-bin*'],
+        );
+
+        $this->assertSame('/owa*', $detector->findMatchingPath('/owa/'));
+        $this->assertNull($detector->findMatchingPath('/home'));
+    }
 }

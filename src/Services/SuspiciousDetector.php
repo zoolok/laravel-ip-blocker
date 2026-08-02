@@ -37,22 +37,50 @@ class SuspiciousDetector
             return true;
         }
 
-        if ($userAgent !== null && $this->matchesAny($this->suspiciousUserAgents, mb_strtolower($userAgent), caseInsensitive: true)) {
+        if ($this->findMatchingUserAgent($userAgent) !== null) {
             return true;
         }
 
-        return $this->matchesAny($this->suspiciousPaths, mb_strtolower($url), caseInsensitive: true);
+        return $this->findMatchingPath($url) !== null;
     }
 
     /**
-     * Check whether the subject matches any of the patterns.
+     * Find the first user-agent pattern that matches the given header.
+     *
+     * @param string|null $userAgent User-Agent header, or null.
+     * @return string|null The matching pattern, or null when nothing matched.
+     */
+    public function findMatchingUserAgent(?string $userAgent): ?string
+    {
+        if ($userAgent === null || $userAgent === '') {
+            return null;
+        }
+
+        $subject = mb_strtolower($userAgent);
+
+        return $this->findMatch($this->suspiciousUserAgents, $subject, caseInsensitive: true);
+    }
+
+    /**
+     * Find the first path pattern that matches the given URL.
+     *
+     * @param string $url URL path (with leading slash).
+     * @return string|null The matching pattern, or null when nothing matched.
+     */
+    public function findMatchingPath(string $url): ?string
+    {
+        return $this->findMatch($this->suspiciousPaths, mb_strtolower($url), caseInsensitive: true);
+    }
+
+    /**
+     * Find the first pattern matching the subject.
      *
      * @param array<int, string> $patterns Str::is() patterns.
      * @param string $subject Value to match against.
      * @param bool $caseInsensitive Lowercase both patterns and subject first.
-     * @return bool True when any pattern matches.
+     * @return string|null The matching pattern, or null when nothing matched.
      */
-    private function matchesAny(array $patterns, string $subject, bool $caseInsensitive): bool
+    private function findMatch(array $patterns, string $subject, bool $caseInsensitive): ?string
     {
         foreach ($patterns as $pattern) {
             if ($pattern === '' || $pattern === '*') {
@@ -62,10 +90,10 @@ class SuspiciousDetector
             $normalized = $caseInsensitive ? mb_strtolower($pattern) : $pattern;
 
             if (Str::is($normalized, $subject)) {
-                return true;
+                return $pattern;
             }
         }
 
-        return false;
+        return null;
     }
 }

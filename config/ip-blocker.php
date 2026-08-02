@@ -69,6 +69,17 @@ return [
     |
     */
     'suspicious' => [
+        /*
+         * Block an IP immediately when any of its requests matches a
+         * suspicious user-agent or path pattern, even if the request counts
+         * stay below the thresholds. User-agent matching is safe (scanner
+         * UAs like zgrab/ExchangeScanner never come from real users) and is
+         * enabled by default. Path matching is off by default because broad
+         * patterns like '/vendor*' can match legitimate admin-panel assets.
+         */
+        'block_on_user_agent' => (bool) env('IP_BLOCKER_BLOCK_ON_UA', true),
+        'block_on_path' => (bool) env('IP_BLOCKER_BLOCK_ON_PATH', false),
+
         'user_agents' => [
             '*exchangescanner*',
             '*zgrab*',

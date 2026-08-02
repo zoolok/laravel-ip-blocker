@@ -15,6 +15,12 @@ class IpAnalyzer
      * @param int $maxRequests Maximum allowed total requests within the window.
      * @param int $maxUniqueUrls Maximum allowed unique URLs requested.
      * @param int $blockDuration Default block duration in minutes (0 = permanent).
+     * @param SuspiciousDetector|null $detector Detector used to flag IPs matching
+     *                                         suspicious user-agent or path patterns.
+     * @param bool $blockOnUserAgent Block an IP immediately when any of its requests
+     *                                matches a suspicious user-agent pattern.
+     * @param bool $blockOnPath Block an IP immediately when any of its requests
+     *                          matches a suspicious path pattern.
      */
     public function __construct(
         private readonly int $analysisWindow = 5,
@@ -22,6 +28,9 @@ class IpAnalyzer
         private readonly int $maxRequests = 100,
         private readonly int $maxUniqueUrls = 20,
         private readonly int $blockDuration = 60,
+        private readonly ?SuspiciousDetector $detector = null,
+        private readonly bool $blockOnUserAgent = false,
+        private readonly bool $blockOnPath = false,
     ) {}
 
     /**
@@ -59,7 +68,7 @@ class IpAnalyzer
             $windowMinutes = max(1, $this->analysisWindow);
             $requestsPerMinute = round($totalRequests / $windowMinutes, 2);
 
-            $reasons = [];
+            $reasons = $this->patternMatchReasons($ipRequests);
 
             if ($notFoundCount >= $this->max404) {
                 $reasons[] = "Too many 404 responses: {$notFoundCount} in {$this->analysisWindow} min (limit: {$this->max404})";
@@ -126,7 +135,7 @@ class IpAnalyzer
         $uniqueUrls = $ipRequests->pluck('url')->unique()->count();
         $requestsPerMinute = round($totalRequests / max(1, $this->analysisWindow), 2);
 
-        $reasons = [];
+        $reasons = $this->patternMatchReasons($ipRequests);
 
         if ($notFoundCount >= $this->max404) {
             $reasons[] = "Too many 404 responses: {$notFoundCount} in {$this->analysisWindow} min (limit: {$this->max404})";
@@ -163,5 +172,71 @@ class IpAnalyzer
         }
 
         return now()->addMinutes($this->blockDuration);
+    }
+
+    /**
+     * Collect blocking reasons based on suspicious user-agent/path patterns.
+     *
+     * When enabled, a single request matching a suspicious user-agent or
+     * path pattern is enough to flag the IP, regardless of request counts.
+     *
+     * @param \Illuminate\Support\Collection<int, SuspiciousRequest> $ipRequests Requests of a single IP.
+     * @return array<int, string> List of pattern-based blocking reasons.
+     */
+    private function patternMatchReasons($ipRequests): array
+    {
+        $reasons = [];
+
+        if ($this->detector === null || (! $this->blockOnUserAgent && ! $this->blockOnPath)) {
+            return $reasons;
+        }
+
+        foreach ($ipRequests as $request) {
+            $userAgent = $request->user_agent;
+            $path = $this->extractPath($request->url);
+
+            if ($this->blockOnUserAgent && $userAgent !== null && $userAgent !== '') {
+                $matched = $this->detector->findMatchingUserAgent($userAgent);
+
+                if ($matched !== null) {
+                    $reasons[] = "Suspicious user-agent match: {$matched}";
+                    break;
+                }
+            }
+
+            if ($this->blockOnPath) {
+                $matched = $this->detector->findMatchingPath($path);
+
+                if ($matched !== null) {
+                    $reasons[] = "Suspicious path match: {$matched}";
+                    break;
+                }
+            }
+        }
+
+        return $reasons;
+    }
+
+    /**
+     * Extract the path component from a URL or path string.
+     *
+     * @param string $url Full URL or path (e.g. 'https://example.com/owa' or '/owa').
+     * @return string Path with a leading slash.
+     */
+    private function extractPath(string $url): string
+    {
+        $path = $url;
+
+        if (preg_match('#^https?://#i', $url)) {
+            $parsed = parse_url($url);
+
+            $path = $parsed['path'] ?? '/';
+        }
+
+        if (! str_starts_with($path, '/')) {
+            $path = '/'.$path;
+        }
+
+        return $path;
     }
 }
