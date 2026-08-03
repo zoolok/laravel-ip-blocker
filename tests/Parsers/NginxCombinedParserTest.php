@@ -153,6 +153,17 @@ class NginxCombinedParserTest extends TestCase
         $this->assertNull($parser->parseLine($line));
     }
 
+    public function test_truncates_method_longer_than_10_chars(): void
+    {
+        $line = '10.0.0.1 - - [10/Jul/2026:13:55:36 +0000] "\x16\x03\x01\x01\x23\x01\x00\x01\x1F\x03\x03 ABC HTTP/1.1" 400 0 "-" "-"';
+
+        $result = $this->parser->parseLine($line);
+
+        $this->assertNotNull($result);
+        $this->assertLessThanOrEqual(10, strlen($result->method));
+        $this->assertSame(mb_substr(strtoupper('\x16\x03\x01\x01\x23\x01\x00\x01\x1F\x03\x03'), 0, 10), $result->method);
+    }
+
     public function test_excluded_admin_path_not_tracked_even_with_503(): void
     {
         $detector = new SuspiciousDetector(excludedPaths: ['/admin*']);

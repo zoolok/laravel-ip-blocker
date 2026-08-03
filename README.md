@@ -269,12 +269,26 @@ User-Agent**, даже если сделан всего один запрос и
 - **Всегда исключайте админку и кабинеты** из отслеживания.
 - **После разблокировки владельца** удалите его IP и из `blocked_ips`, и из
   `suspicious_requests`, а затем перегенерируйте deny-конфиг:
-
 ```bash
 php artisan tinker --execute="\Zoolok\IpBlocker\Models\BlockedIp::where('ip','YOUR_IP')->delete();"
 php artisan tinker --execute="\Zoolok\IpBlocker\Models\SuspiciousRequest::where('ip','YOUR_IP')->delete();"
 php artisan ip:block --force
 ```
+
+#### Устойчивость к мусорным строкам лога (v1.6.5)
+
+В access-логи nginx попадают не только обычные HTTP-запросы, но и бинарные
+TLS-последовательности (например, от сканеров портов):
+
+```
+3.131.220.121 - - [03/Aug/2026:00:31:01 +0300] "\x16\x03\x01\x01\x23..." 400 0 "-" "-"
+```
+
+Парсер захватывал весь бинарный блоб как «метод запроса», что приводило к
+ошибке записи в БД `value too long for type character varying(10)` (колонка
+`method` в `suspicious_requests` имеет длину `varchar(10)`). Начиная с v1.6.5
+метод запроса обрезается до 10 символов ещё в парсере, поэтому такие строки
+сохраняются корректно и не роняют `ip:parse-log --block`.
 
 ## Тестирование
 

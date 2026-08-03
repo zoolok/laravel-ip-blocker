@@ -99,7 +99,7 @@ abstract class AbstractParser implements LogParserStrategy
         }
 
         $url = $this->normalizeUrl($matches['url'] ?? '/');
-        $method = strtoupper($matches['method'] ?? 'GET');
+        $method = mb_strtoupper(mb_substr($matches['method'] ?? 'GET', 0, 10));
         $timestamp = $this->parseTimestamp($matches['date'] ?? null);
         $userAgent = $matches['ua'] ?? null;
         $referer = $matches['referer'] ?? null;
