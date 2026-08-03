@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon $updated_at
  *
  * @method static Builder|static active()
+ * @method static Builder|static expired()
  * @method static Builder|static forIp(string $ip)
  */
 class BlockedIp extends Model
@@ -59,6 +60,23 @@ class BlockedIp extends Model
                 $q->whereNull('expires_at')
                     ->orWhere('expires_at', '>', now());
             });
+    }
+
+    /**
+     * Scope: только истёкшие блокировки (is_active = false или срок истёк).
+     *
+     * @param Builder<BlockedIp> $query
+     * @return void
+     */
+    public function scopeExpired(Builder $query): void
+    {
+        $query->where(function (Builder $q) {
+            $q->where('is_active', false)
+                ->orWhere(function (Builder $qq) {
+                    $qq->whereNotNull('expires_at')
+                        ->where('expires_at', '<=', now());
+                });
+        });
     }
 
     /**

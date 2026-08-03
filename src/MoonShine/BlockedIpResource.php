@@ -53,6 +53,9 @@ class BlockedIpResource extends ModelResource
     /**
      * Get the query tags for quick filtering.
      *
+     * «Активные» и «Истекшие» вычисляются по сроку истечения, а не только по
+     * флагу is_active (пакет никогда не выставляет is_active = false).
+     *
      * Works in both MoonShine 3.x (resource-level tags) and 4.x
      * (resource tags are delegated by the CrudResource).
      *
@@ -61,8 +64,8 @@ class BlockedIpResource extends ModelResource
     protected function queryTags(): array
     {
         return [
-            MoonShineVersion::queryTag('Активные', fn ($query) => $query->where('is_active', true)),
-            MoonShineVersion::queryTag('Истекшие', fn ($query) => $query->where('is_active', false)),
+            MoonShineVersion::queryTag('Активные', fn ($query) => $query->active()),
+            MoonShineVersion::queryTag('Истекшие', fn ($query) => $query->expired()),
         ];
     }
 }
