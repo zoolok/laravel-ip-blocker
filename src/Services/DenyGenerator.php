@@ -4,6 +4,7 @@ namespace Zoolok\IpBlocker\Services;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Zoolok\IpBlocker\Models\BlockedIp;
 
 class DenyGenerator
 {
@@ -23,6 +24,24 @@ class DenyGenerator
         private readonly string $allowOverridePath = '/var/www/html/.htaccess',
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
+
+    /**
+     * Regenerate the deny config from all currently active blocks in the
+     * blocked_ips table.
+     *
+     * The generated file always mirrors the database: it contains every IP
+     * whose block is active (is_active = true and, if set, not yet expired)
+     * and drops IPs whose block was removed or has already expired. This keeps
+     * the config in sync with the table on every add, edit or delete.
+     *
+     * @return bool True on success, false on failure.
+     */
+    public function syncFromDatabase(): bool
+    {
+        $ips = BlockedIp::active()->pluck('ip')->all();
+
+        return $this->generate($ips);
+    }
 
     /**
      * Generate a deny configuration for the web server.

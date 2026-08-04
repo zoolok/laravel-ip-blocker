@@ -27,6 +27,7 @@ class TestCase extends OrchestraTestCase
         $app['config']->set('ip-blocker.log_format', 'auto');
         $app['config']->set('ip-blocker.report.enabled', false);
         $app['config']->set('ip-blocker.moonshine.enabled', false);
+        $app['config']->set('ip-blocker.server.sync_on_change', false);
     }
 
     protected function setUp(): void

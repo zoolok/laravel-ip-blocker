@@ -161,6 +161,15 @@ return [
         'deny_path' => env('IP_BLOCKER_DENY_PATH', '/etc/nginx/conf.d/blocked-ips.conf'),
         'reload_command' => env('IP_BLOCKER_RELOAD_CMD', 'nginx -s reload'),
         'allow_override_path' => env('IP_BLOCKER_ALLOW_OVERRIDE_PATH', '/var/www/html/.htaccess'),
+
+        /*
+         * Automatically regenerate the web server deny config whenever a
+         * record in blocked_ips is created, updated or deleted (e.g. from
+         * the MoonShine admin panel). The generated file mirrors the table:
+         * it contains every IP with an active block and drops removed or
+         * expired ones.
+         */
+        'sync_on_change' => (bool) env('IP_BLOCKER_SYNC_ON_CHANGE', true),
     ],
 
     /*

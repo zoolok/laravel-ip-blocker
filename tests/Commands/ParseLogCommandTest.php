@@ -28,6 +28,7 @@ class ParseLogCommandTest extends TestCase
 
         $app['config']->set('ip-blocker.thresholds.max_404_per_window', 1);
         $app['config']->set('ip-blocker.analysis_window_minutes', 60);
+        $app['config']->set('ip-blocker.server.sync_on_change', false);
     }
 
     protected function setUp(): void

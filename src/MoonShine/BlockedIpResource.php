@@ -8,10 +8,11 @@ use MoonShine\Laravel\Resources\ModelResource;
 use MoonShine\Support\ListOf;
 use Zoolok\IpBlocker\Models\BlockedIp;
 use Zoolok\IpBlocker\MoonShine\Pages\BlockedIpDetailPage;
+use Zoolok\IpBlocker\MoonShine\Pages\BlockedIpFormPage;
 use Zoolok\IpBlocker\MoonShine\Pages\BlockedIpIndexPage;
 
 /**
- * @extends ModelResource<BlockedIp, BlockedIpIndexPage, null, BlockedIpDetailPage>
+ * @extends ModelResource<BlockedIp, BlockedIpIndexPage, BlockedIpFormPage, BlockedIpDetailPage>
  */
 class BlockedIpResource extends ModelResource
 {
@@ -30,6 +31,7 @@ class BlockedIpResource extends ModelResource
     {
         return [
             BlockedIpIndexPage::class,
+            BlockedIpFormPage::class,
             BlockedIpDetailPage::class,
         ];
     }
@@ -37,8 +39,9 @@ class BlockedIpResource extends ModelResource
     /**
      * Get the allowed actions.
      *
-     * Uses the installed version's Action enum. Actions CREATE and UPDATE
-     * are removed so the resource is read-only.
+     * Uses the installed version's Action enum. The CREATE action is removed
+     * so new blocks can only be created via the CLI/commands. UPDATE stays
+     * enabled so rows can be edited from the admin panel.
      *
      * @return ListOf<\MoonShine\Support\Enums\Action|\MoonShine\Laravel\Enums\Action>
      */
@@ -46,7 +49,6 @@ class BlockedIpResource extends ModelResource
     {
         return parent::activeActions()->except(
             MoonShineVersion::action('CREATE'),
-            MoonShineVersion::action('UPDATE'),
         );
     }
 

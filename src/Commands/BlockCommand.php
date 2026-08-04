@@ -40,7 +40,7 @@ class BlockCommand extends Command
         $customDuration = $this->option('duration');
 
         if ($specificIp !== null) {
-            return $this->blockSpecificIp($analyzer, $specificIp, $customReason, $customDuration, $dryRun, $force);
+            return $this->blockSpecificIp($analyzer, $denyGenerator, $specificIp, $customReason, $customDuration, $dryRun, $force, $noNginx);
         }
 
         return $this->analyzeAndBlock($analyzer, $denyGenerator, $dryRun, $force, $noNginx, $customDuration);
@@ -54,20 +54,24 @@ class BlockCommand extends Command
      * or the user cancels the confirmation prompt).
      *
      * @param IpAnalyzer $analyzer IP analysis service.
+     * @param DenyGenerator $denyGenerator Web server deny config generator.
      * @param string $ip IP address to block.
      * @param string|null $customReason Optional custom blocking reason.
      * @param string|null $customDuration Optional block duration in minutes.
      * @param bool $dryRun If true, do not create the block record.
      * @param bool $force If true, skip the confirmation prompt.
+     * @param bool $noNginx If true, skip web server deny config regeneration.
      * @return int Command exit code.
      */
     private function blockSpecificIp(
         IpAnalyzer $analyzer,
+        DenyGenerator $denyGenerator,
         string $ip,
         ?string $customReason,
         ?string $customDuration,
         bool $dryRun,
         bool $force = false,
+        bool $noNginx = false,
     ): int {
         if (filter_var($ip, FILTER_VALIDATE_IP) === false) {
             $this->error("Invalid IP address: {$ip}");
@@ -116,7 +120,7 @@ class BlockCommand extends Command
 
         $this->createBlock($ip, $reason, 'command', $customDuration);
 
-        return self::SUCCESS;
+        return $this->syncDenyConfig($denyGenerator, $noNginx);
     }
 
     /**
@@ -180,7 +184,7 @@ class BlockCommand extends Command
 
         if (! $dryRun && count($blockedIps) > 0 && ! $noNginx) {
             $this->components->info('Updating web server deny configuration...');
-            $denyGenerator->generate($blockedIps);
+            $this->syncDenyConfig($denyGenerator, $noNginx);
         }
 
         $this->table(
@@ -267,5 +271,30 @@ class BlockCommand extends Command
         $durationLabel = $duration > 0 ? "{$duration} min" : 'permanent';
 
         $this->components->info("IP {$ip} blocked ({$durationLabel}). Reason: {$reason}");
+    }
+
+    /**
+     * Regenerate the web server deny config from all active blocked IPs.
+     *
+     * Reads the blocked_ips table so already-blocked IPs are preserved and
+     * the config always matches the database.
+     *
+     * @param DenyGenerator $denyGenerator Web server deny config generator.
+     * @param bool $noNginx If true, skip web server deny config regeneration.
+     * @return int Command exit code.
+     */
+    private function syncDenyConfig(DenyGenerator $denyGenerator, bool $noNginx): int
+    {
+        if ($noNginx) {
+            return self::SUCCESS;
+        }
+
+        if ($denyGenerator->syncFromDatabase()) {
+            $this->components->info('Web server deny configuration updated.');
+        } else {
+            $this->components->warn('Failed to update web server deny configuration. Update it manually.');
+        }
+
+        return self::SUCCESS;
     }
 }

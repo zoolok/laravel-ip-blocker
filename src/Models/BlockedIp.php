@@ -5,6 +5,8 @@ namespace Zoolok\IpBlocker\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
+use Zoolok\IpBlocker\Services\DenyGenerator;
 
 /**
  * @property int $id
@@ -24,6 +26,61 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class BlockedIp extends Model
 {
     protected $guarded = ['id'];
+
+    /**
+     * Register model event listeners to keep the web server deny config in
+     * sync with the blocked_ips table.
+     *
+     * When a record is created, updated or deleted (e.g. from the MoonShine
+     * admin panel), the deny config is regenerated from all currently active
+     * blocks. Controlled by the "ip-blocker.server.sync_on_change" config so
+     * it can be disabled when undesired.
+     *
+     * @return void
+     */
+    protected static function booted(): void
+    {
+        if (! static::shouldSyncDenyConfig()) {
+            return;
+        }
+
+        static::saved(function () {
+            self::syncDenyConfigFromDatabase();
+        });
+
+        static::deleted(function () {
+            self::syncDenyConfigFromDatabase();
+        });
+    }
+
+    /**
+     * Whether the deny config should be regenerated on model changes.
+     *
+     * @return bool
+     */
+    private static function shouldSyncDenyConfig(): bool
+    {
+        return (bool) config('ip-blocker.server.sync_on_change', true);
+    }
+
+    /**
+     * Regenerate the web server deny config from all active blocked IPs.
+     *
+     * Failures are caught and logged so a broken config path never breaks the
+     * application flow.
+     *
+     * @return void
+     */
+    private static function syncDenyConfigFromDatabase(): void
+    {
+        try {
+            app(DenyGenerator::class)->syncFromDatabase();
+        } catch (\Throwable $e) {
+            Log::error('[BlockedIp] Failed to sync deny config after model change', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 
     /**
      * @return array<string, string>

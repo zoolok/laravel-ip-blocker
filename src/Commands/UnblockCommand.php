@@ -144,9 +144,7 @@ class UnblockCommand extends Command
 
         $this->components->info('Regenerating web server deny configuration...');
 
-        $remaining = BlockedIp::active()->pluck('ip')->all();
-
-        if ($denyGenerator->generate($remaining)) {
+        if ($denyGenerator->syncFromDatabase()) {
             $this->components->info('Web server deny configuration updated.');
         } else {
             $this->components->warn('Failed to regenerate web server deny configuration. Update it manually.');

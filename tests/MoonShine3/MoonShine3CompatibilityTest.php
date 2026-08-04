@@ -103,11 +103,11 @@ class MoonShine3CompatibilityTest extends TestCase
     }
 
     /**
-     * php artisan test --filter=test_active_actions_exclude_create_update tests/MoonShine3/MoonShine3CompatibilityTest.php
+     * php artisan test --filter=test_active_actions_exclude_create tests/MoonShine3/MoonShine3CompatibilityTest.php
      *
-     * Тест: из activeActions исключены create и update.
+     * Тест: из activeActions исключён create, но update остаётся (строки можно редактировать).
      */
-    public function test_active_actions_exclude_create_update(): void
+    public function test_active_actions_exclude_create(): void
     {
         $core = app(MoonShine::class);
 
@@ -120,7 +120,7 @@ class MoonShine3CompatibilityTest extends TestCase
         $this->assertInstanceOf(BlockedIpResource::class, $resource);
 
         $this->assertFalse($resource->hasAction(\MoonShine\Laravel\Enums\Action::CREATE));
-        $this->assertFalse($resource->hasAction(\MoonShine\Laravel\Enums\Action::UPDATE));
+        $this->assertTrue($resource->hasAction(\MoonShine\Laravel\Enums\Action::UPDATE));
         $this->assertTrue($resource->hasAction(\MoonShine\Laravel\Enums\Action::VIEW));
         $this->assertTrue($resource->hasAction(\MoonShine\Laravel\Enums\Action::DELETE));
     }

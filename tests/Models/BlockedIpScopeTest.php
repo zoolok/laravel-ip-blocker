@@ -24,6 +24,8 @@ class BlockedIpScopeTest extends TestCase
             'database' => ':memory:',
             'prefix' => '',
         ]);
+
+        $app['config']->set('ip-blocker.server.sync_on_change', false);
     }
 
     protected function setUp(): void

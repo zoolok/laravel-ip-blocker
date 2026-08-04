@@ -24,6 +24,7 @@ class TrackSuspiciousIpsIntegrationTest extends TestCase
         ]);
 
         $app['config']->set('ip-blocker.exclude_paths', ['/healthcheck']);
+        $app['config']->set('ip-blocker.server.sync_on_change', false);
     }
 
     protected function setUp(): void

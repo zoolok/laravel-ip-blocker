@@ -161,6 +161,11 @@ php artisan ip:install-moonshine
 `is_active = true`. С v1.6.6 фильтры корректно разделяют действующие и
 истёкшие блокировки.
 
+Создание новых записей из админки отключено (они создаются командой
+`ip:block`), но каждая строка доступна для **редактирования** и удаления.
+После сохранения или удаления записи deny-конфиг веб-сервера автоматически
+перегенерируется из таблицы `blocked_ips` (см. `IP_BLOCKER_SYNC_ON_CHANGE`).
+
 ## Поддерживаемые форматы логов
 
 | Формат | Конфиг | Пример |
@@ -185,6 +190,7 @@ php artisan ip:install-moonshine
 | `IP_BLOCKER_SERVER_TYPE` | `nginx` | Тип веб-сервера (nginx/apache) |
 | `IP_BLOCKER_DENY_PATH` | `/etc/nginx/conf.d/blocked-ips.conf` | Путь для deny-конфига |
 | `IP_BLOCKER_RELOAD_CMD` | `nginx -s reload` | Команда перезагрузки сервера |
+| `IP_BLOCKER_SYNC_ON_CHANGE` | `true` | Перегенерировать deny-конфиг при изменении записей blocked_ips |
 | `IP_BLOCKER_REPORT_EMAIL` | — | Email для отчётов |
 | `IP_BLOCKER_MOONSHINE_ENABLED` | `false` | Включить MoonShine-ресурс |
 | `IP_BLOCKER_RETENTION_DAYS` | `30` | Дней хранить записи |
