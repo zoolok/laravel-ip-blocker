@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Zoolok\IpBlocker\MoonShine\Pages;
 
-use MoonShine\Contracts\UI\ComponentContract;
 use MoonShine\Laravel\Pages\Crud\FormPage;
 use MoonShine\UI\Fields\Checkbox;
 use MoonShine\UI\Fields\Date;
@@ -33,16 +32,5 @@ class BlockedIpFormPage extends FormPage
             Date::make('Истекает', 'expires_at'),
             Checkbox::make('Активно', 'is_active'),
         ];
-    }
-
-    /**
-     * Modify the form component before rendering.
-     *
-     * @param ComponentContract $component Component to modify.
-     * @return ComponentContract Modified component.
-     */
-    protected function modifyFormComponent(ComponentContract $component): ComponentContract
-    {
-        return $component;
     }
 }
